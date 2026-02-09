@@ -1,7 +1,7 @@
 Иконка приложения (icon.png)
 ============================
 
-Куда положить: сюда, в папку drawable.
+Куда положить: в папку app/src/main/res/drawable/
 
 Полный путь:
   kael_chat_android\app\src\main\res\drawable\
