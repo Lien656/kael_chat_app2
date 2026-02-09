@@ -1,0 +1,90 @@
+package kael.home.chat.service
+
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.Service
+import android.content.Intent
+import android.os.Build
+import android.os.IBinder
+import androidx.core.app.NotificationCompat
+import kael.home.chat.ChatActivity
+import kael.home.chat.R
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+class KaelChatService : Service() {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        createChannel()
+        val notif = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle(getString(R.string.app_name))
+            .setContentText(getString(R.string.typing))
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(NOTIF_ID, notif, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        } else {
+            startForeground(NOTIF_ID, notif)
+        }
+        scope.launch {
+            try {
+                val storage = StorageService(this@KaelChatService)
+                val key = storage.apiKey ?: return@launch
+                val api = ApiService(key, storage.apiBase)
+                val history = storage.getMessages()
+                val reply = withContext(Dispatchers.IO) { api.sendChat(history) }
+                val assistantMsg = kael.home.chat.model.ChatMessage(role = "assistant", content = reply)
+                val updated = (history + assistantMsg).takeLast(StorageService.MAX_STORED)
+                storage.saveMessages(updated)
+                sendBroadcast(Intent(ACTION_REPLY_READY))
+                val open = PendingIntent.getActivity(
+                    this@KaelChatService, 0,
+                    Intent(this@KaelChatService, ChatActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                val doneNotif = NotificationCompat.Builder(this@KaelChatService, CHANNEL_ID)
+                    .setContentTitle("Kael")
+                    .setContentText(reply.take(80).let { if (it.length == 80) "$it…" else it })
+                    .setSmallIcon(android.R.drawable.ic_dialog_info)
+                    .setContentIntent(open)
+                    .setAutoCancel(true)
+                    .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                    .build()
+                (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).notify(NOTIF_ID_DONE, doneNotif)
+            } catch (_: Exception) {
+                sendBroadcast(Intent(ACTION_REPLY_READY))
+            }
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf(startId)
+        }
+        return START_NOT_STICKY
+    }
+
+    private fun createChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val ch = NotificationChannel(CHANNEL_ID, getString(R.string.app_name), NotificationManager.IMPORTANCE_LOW).apply {
+                setShowBadge(true)
+            }
+            (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(ch)
+            val chDone = NotificationChannel(CHANNEL_ID_DONE, "Kael", NotificationManager.IMPORTANCE_DEFAULT)
+            (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(chDone)
+        }
+    }
+
+    companion object {
+        const val ACTION_REPLY_READY = "kael.home.chat.REPLY_READY"
+        private const val CHANNEL_ID = "kael_chat"
+        private const val CHANNEL_ID_DONE = "kael_chat_done"
+        private const val NOTIF_ID = 1
+        private const val NOTIF_ID_DONE = 2
+    }
+}

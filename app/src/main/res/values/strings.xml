@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">KAELHOME</string>
+    <string name="api_key_label">API ключ</string>
+    <string name="api_key_hint">Вставьте API ключ</string>
+    <string name="save_and_continue">Сохранить и продолжить</string>
+    <string name="input_hint">Пиши…</string>
+    <string name="settings">Настройки</string>
+    <string name="change_api_key">Изменить API ключ</string>
+    <string name="change_api_url">Изменить API URL</string>
+    <string name="console">Открыть консоль</string>
+    <string name="api_url_hint">https://api.openai.com/v1</string>
+    <string name="save">Сохранить</string>
+    <string name="typing">печатает…</string>
+    <string name="copied">Скопировано</string>
+    <string name="saved">Сохранено:</string>
+    <string name="error_save">Не удалось сохранить файл</string>
+    <string name="attachments">Вложения</string>
+</resources>
