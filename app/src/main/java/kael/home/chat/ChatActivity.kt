@@ -172,8 +172,6 @@ class ChatActivity : AppCompatActivity() {
                 return@launch
             }
             loading = true
-            adapter.showTyping = true
-            adapter.notifyItemInserted(messages.size)
             scrollToBottom()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && ContextCompat.checkSelfPermission(this@ChatActivity, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 0)
