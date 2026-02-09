@@ -1,6 +1,5 @@
 package kael.home.chat
 
-import android.animation.ValueAnimator
 import android.graphics.BitmapFactory
 import android.view.LayoutInflater
 import android.view.View
@@ -10,7 +9,6 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
-import kotlin.math.sin
 import kael.home.chat.model.ChatMessage
 import kael.home.chat.util.FileParse
 import java.text.SimpleDateFormat
@@ -176,41 +174,8 @@ class ChatAdapter(
     }
 
     class TypingHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        private val dotsContainer = itemView.findViewById<LinearLayout>(R.id.typingDots)
-        private var animator: ValueAnimator? = null
-
-        fun startDots() {
-            if (dotsContainer?.childCount == 0) {
-                val ctx = itemView.context
-                val size = ctx.resources.getDimensionPixelSize(R.dimen.typing_dot_size)
-                for (i in 0..2) {
-                    val dot = View(ctx)
-                    dot.setBackgroundResource(R.drawable.dot_typing)
-                    val params = ViewGroup.MarginLayoutParams(size, size)
-                    params.marginStart = if (i == 0) 0 else size / 2
-                    dot.layoutParams = params
-                    dotsContainer?.addView(dot)
-                }
-                animator = ValueAnimator.ofFloat(0f, 1f).apply {
-                    duration = 1200
-                    repeatCount = ValueAnimator.INFINITE
-                    addUpdateListener { anim ->
-                        val value = (anim.animatedValue as Float)
-                        for (i in 0 until (dotsContainer?.childCount ?: 0)) {
-                            val phase = (value + i / 3f) % 1f
-                            val visible = sin(phase * 2 * Math.PI).toFloat() > 0
-                            dotsContainer?.getChildAt(i)?.alpha = if (visible) 1f else 0.3f
-                        }
-                    }
-                    start()
-                }
-            }
-        }
-
-        fun stopDots() {
-            animator?.cancel()
-            animator = null
-        }
+        fun startDots() {}
+        fun stopDots() {}
     }
 
     override fun onViewRecycled(holder: RecyclerView.ViewHolder) {
