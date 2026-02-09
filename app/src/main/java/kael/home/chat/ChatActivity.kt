@@ -213,8 +213,15 @@ class ChatActivity : AppCompatActivity() {
         isChatOnScreen = true
         registerReceiver(replyReceiver, IntentFilter(kael.home.chat.service.KaelChatService.ACTION_REPLY_READY), if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) Context.RECEIVER_NOT_EXPORTED else 0)
         refreshMessagesFromStorage()
+        if (messages.isNotEmpty() && messages.last().role == "assistant") {
+            loading = false
+            adapter.showTyping = false
+            adapter.notifyDataSetChanged()
+        }
         if (pendingReplyFromBackground) {
             pendingReplyFromBackground = false
+            loading = false
+            adapter.showTyping = false
             refreshMessagesFromStorage()
             scrollToBottom()
             if (messages.isNotEmpty() && messages.last().role == "assistant") {
