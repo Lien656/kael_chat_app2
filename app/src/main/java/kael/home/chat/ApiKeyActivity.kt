@@ -21,7 +21,7 @@ class ApiKeyActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnSave).setOnClickListener {
             val key = input.text?.toString()?.trim()
             if (!key.isNullOrEmpty()) {
-                storage.setApiKey(key)
+                storage.apiKey = key
                 finish()
             }
         }

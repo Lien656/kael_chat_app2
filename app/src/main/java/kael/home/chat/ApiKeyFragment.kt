@@ -25,7 +25,7 @@ class ApiKeyFragment : Fragment() {
         btn.setOnClickListener {
             val key = input.text?.toString()?.trim()
             if (key.isNullOrEmpty()) return@setOnClickListener
-            storage?.setApiKey(key)
+            storage?.apiKey = key
             storage?.setFirstRunDone()
             onDone?.invoke()
         }

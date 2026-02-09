@@ -22,7 +22,7 @@ class ApiUrlActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnSave).setOnClickListener {
             val url = input.text?.toString()?.trim()
             if (!url.isNullOrEmpty()) {
-                storage.setApiBase(url)
+                storage.apiBase = url
                 finish()
             }
         }

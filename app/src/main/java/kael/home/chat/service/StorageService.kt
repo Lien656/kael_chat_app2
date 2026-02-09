@@ -28,16 +28,8 @@ class StorageService(context: Context) {
             prefs.edit().putBoolean(KEY_FIRST_RUN, value).apply()
         }
 
-    fun setApiKey(value: String) {
-        apiKey = value
-    }
-
     fun setFirstRunDone() {
         isFirstRun = false
-    }
-
-    fun setApiBase(value: String) {
-        apiBase = value
     }
 
     fun getMessages(): List<ChatMessage> {
