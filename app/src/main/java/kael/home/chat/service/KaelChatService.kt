@@ -28,14 +28,14 @@ class KaelChatService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         createChannel()
         requestJob?.cancel()
-        val showOngoingNotif = !ChatActivity.isChatOnScreen
+        val chatOnScreen = ChatActivity.isChatOnScreen
         val notif = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(getString(R.string.app_name))
-            .setContentText(getString(R.string.typing))
+            .setContentTitle(if (chatOnScreen) "" else getString(R.string.app_name))
+            .setContentText(if (chatOnScreen) "" else getString(R.string.typing))
             .setSmallIcon(R.drawable.ic_launcher)
             .setOngoing(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setVisibility(if (showOngoingNotif) NotificationCompat.VISIBILITY_PUBLIC else NotificationCompat.VISIBILITY_SECRET)
+            .setPriority(if (chatOnScreen) NotificationCompat.PRIORITY_MIN else NotificationCompat.PRIORITY_LOW)
+            .setVisibility(if (chatOnScreen) NotificationCompat.VISIBILITY_SECRET else NotificationCompat.VISIBILITY_PUBLIC)
             .build()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(NOTIF_ID, notif, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)

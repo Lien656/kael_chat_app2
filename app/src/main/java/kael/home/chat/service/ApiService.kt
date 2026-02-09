@@ -144,7 +144,7 @@ class ApiService(private val apiKey: String, private val apiBase: String) {
             .put("model", MODEL_PRIMARY)
             .put("messages", messages)
             .put("stream", false)
-            .put("temperature", 1.2)
+            .put("temperature", 1.0)
         val req = Request.Builder()
             .url(url("chat/completions"))
             .header("Authorization", "Bearer $apiKey")

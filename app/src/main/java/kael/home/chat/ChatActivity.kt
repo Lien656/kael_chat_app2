@@ -268,13 +268,18 @@ class ChatActivity : AppCompatActivity() {
             adapter.notifyItemChanged(messages.size - 1)
             return
         }
+        val animateUpTo = minOf(full.length, 350)
+        val stepSize = maxOf(1, animateUpTo / 35)
         typingJob = lifecycleScope.launch {
-            for (i in 1..full.length) {
-                delay(25)
+            for (i in (1..animateUpTo).step(stepSize)) {
+                delay(50)
                 typingLength = i
                 adapter.notifyItemChanged(typingMessageIndex)
                 recycler.post { scrollToBottom() }
             }
+            typingLength = full.length
+            adapter.notifyItemChanged(typingMessageIndex)
+            delay(60)
             typingMessageIndex = -1
             typingLength = 0
             adapter.notifyItemChanged(messages.size - 1)
