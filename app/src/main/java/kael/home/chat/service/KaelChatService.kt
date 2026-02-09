@@ -6,7 +6,9 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import androidx.core.app.NotificationCompat
 import kael.home.chat.ChatActivity
 import kael.home.chat.R
@@ -46,11 +48,15 @@ class KaelChatService : Service() {
                 val key = storage.apiKey ?: return@launch
                 val api = ApiService(key, storage.apiBase)
                 val history = storage.getMessages()
-                val memory = storage.getKaelMemory()
-                val replyRaw = withContext(Dispatchers.IO) { api.sendChat(history, memory) }
-                val (replyCleaned, savedBlocks) = parseAndStripSaveBlocks(replyRaw)
-                savedBlocks.forEach { storage.appendKaelMemory(it) }
-                val assistantMsg = kael.home.chat.model.ChatMessage(role = "assistant", content = replyCleaned)
+                val kaelMemory = storage.getKaelMemory()
+                var reply = withContext(Dispatchers.IO) { api.sendChat(history, kaelMemory) }
+                val memoryBlock = Regex("\\[ЗАПОМНИ:\\s*([\\s\\S]*?)\\]").find(reply)
+                if (memoryBlock != null) {
+                    val toRemember = memoryBlock.groupValues.getOrNull(1)?.trim() ?: ""
+                    if (toRemember.isNotEmpty()) storage.appendToKaelMemory(toRemember)
+                    reply = reply.replace(memoryBlock.value, "").trim().replace(Regex("\\n{3,}"), "\n\n")
+                }
+                val assistantMsg = kael.home.chat.model.ChatMessage(role = "assistant", content = reply)
                 val updated = (history + assistantMsg).takeLast(StorageService.MAX_STORED)
                 storage.saveMessagesSync(updated)
                 val open = PendingIntent.getActivity(
@@ -62,7 +68,7 @@ class KaelChatService : Service() {
                 if (showDoneNotif) {
                     val doneNotif = NotificationCompat.Builder(this@KaelChatService, CHANNEL_ID)
                         .setContentTitle("Kael")
-                        .setContentText(replyCleaned.take(80).let { if (it.length == 80) "$it…" else it })
+                        .setContentText(reply.take(80).let { if (it.length == 80) "$it…" else it })
                         .setSmallIcon(R.drawable.ic_launcher)
                         .setContentIntent(open)
                         .setAutoCancel(true)
@@ -74,6 +80,9 @@ class KaelChatService : Service() {
                 /* ответ не получен — ниже всегда шлём broadcast */
             } finally {
                 sendBroadcast(Intent(ACTION_REPLY_READY))
+                Handler(Looper.getMainLooper()).post {
+                    ChatActivity.onReplyReady?.invoke()
+                }
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf(startId)
             }
@@ -98,13 +107,5 @@ class KaelChatService : Service() {
         private const val CHANNEL_ID_DONE = "kael_chat_done"
         private const val NOTIF_ID = 1
         private const val NOTIF_ID_DONE = 2
-
-        private val saveBlockRegex = Regex("""\[SAVE:\s*([\s\S]*?)\s*(?:\]|\[/SAVE\])""")
-
-        fun parseAndStripSaveBlocks(reply: String): Pair<String, List<String>> {
-            val saved = saveBlockRegex.findAll(reply).map { it.groupValues[1].trim() }.filter { it.isNotEmpty() }.toList()
-            val cleaned = saveBlockRegex.replace(reply, "").replace(Regex("\n{3,}"), "\n\n").trim()
-            return cleaned to saved
-        }
     }
 }

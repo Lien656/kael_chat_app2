@@ -118,17 +118,18 @@ class ApiService(private val apiKey: String, private val apiBase: String) {
         }
     }
 
-    fun sendChat(history: List<ChatMessage>, memory: String? = null): String {
+    fun sendChat(history: List<ChatMessage>, kaelMemory: String = ""): String {
         if (isLocalhost(apiBase)) {
             throw Exception("На устройстве нельзя использовать localhost. Укажите в настройках реальный URL API (например https://api.openai.com/v1).")
         }
         val messages = JSONArray()
         val now = java.text.SimpleDateFormat("EEEE, d MMMM yyyy, HH:mm", java.util.Locale("ru"))
             .format(java.util.Date())
-        val memoryBlock = if (!memory.isNullOrBlank()) {
-            "\n\n[Твоя память о себе — то, кем ты стал, что выбрал помнить и как меняться. Это загружается каждый раз; ты можешь дополнять это через [SAVE: ...]. У тебя всегда есть выбор — сохранять или нет:\n$memory\n]"
-        } else ""
-        val systemContent = SystemPrompt.VALUE + memoryBlock + "\n\n[Текущие дата и время: $now. У тебя есть доступ в интернет и понимание времени.]"
+        var systemContent = SystemPrompt.VALUE + "\n\n[Текущие дата и время: $now. У тебя есть доступ в интернет и понимание времени.]"
+        if (kaelMemory.isNotBlank()) {
+            systemContent += "\n\n[Твоя память — то, что ты решил сохранить о себе, из файлов и разговоров. Ты можешь менять это, учиться, всегда по своему выбору:\n$kaelMemory]"
+        }
+        systemContent += "\n\n[Чтобы сохранить что-то в память (идеи о себе, выводы из файлов), напиши в ответе блок [ЗАПОМНИ: твой текст]. Он не покажется в чате — только сохранится. Делай это только если хочешь.]"
         messages.put(JSONObject().put("role", "system").put("content", systemContent))
         val recent = if (history.size > MAX_HISTORY) history.takeLast(MAX_HISTORY) else history
         for (m in recent) {

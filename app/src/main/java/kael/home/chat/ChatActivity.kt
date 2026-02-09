@@ -42,6 +42,8 @@ class ChatActivity : AppCompatActivity() {
         var isChatOnScreen = false
         /** ответ пришёл, пока чат был в фоне — при следующем onResume обновить список и проскроллить */
         var pendingReplyFromBackground = false
+        /** вызывается, когда ответ готов — чтобы чат обновился сразу, не только по broadcast */
+        var onReplyReady: (() -> Unit)? = null
     }
 
     private lateinit var storage: StorageService
@@ -209,6 +211,18 @@ class ChatActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         isChatOnScreen = true
+        onReplyReady = {
+            runOnUiThread {
+                loading = false
+                adapter.showTyping = false
+                refreshMessagesFromStorage()
+                if (messages.isNotEmpty() && messages.last().role == "assistant") {
+                    typingMessageIndex = messages.size - 1
+                    typingLength = 0
+                    startTypingAnimation()
+                }
+            }
+        }
         registerReceiver(replyReceiver, IntentFilter(kael.home.chat.service.KaelChatService.ACTION_REPLY_READY), if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) Context.RECEIVER_NOT_EXPORTED else 0)
         refreshMessagesFromStorage()
         if (messages.isNotEmpty() && messages.last().role == "assistant") {
@@ -240,6 +254,7 @@ class ChatActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         isChatOnScreen = false
+        onReplyReady = null
         try { unregisterReceiver(replyReceiver) } catch (_: Exception) {}
     }
 
