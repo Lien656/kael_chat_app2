@@ -56,7 +56,16 @@ class AttachmentsActivity : AppCompatActivity() {
             "png" -> "image/png"
             "gif" -> "image/gif"
             "webp" -> "image/webp"
-            else -> "image/jpeg"
+            "jpg", "jpeg" -> "image/jpeg"
+            "txt" -> "text/plain"
+            "py" -> "text/x-python"
+            "json" -> "application/json"
+            "xml" -> "application/xml"
+            "html", "htm" -> "text/html"
+            "md" -> "text/markdown"
+            "csv" -> "text/csv"
+            "pdf" -> "application/pdf"
+            else -> "*/*"
         }
     }
 }
@@ -70,15 +79,25 @@ class AttachmentsAdapter(
         return Holder(v)
     }
 
+    private fun isImagePath(path: String): Boolean {
+        val lower = path.lowercase()
+        return lower.endsWith(".jpg") || lower.endsWith(".jpeg") ||
+            lower.endsWith(".png") || lower.endsWith(".gif") || lower.endsWith(".webp")
+    }
+
     override fun onBindViewHolder(holder: Holder, position: Int) {
         val path = paths[position]
         val name = path.substringAfterLast('/')
         holder.name.text = name
-        try {
-            val bmp = BitmapFactory.decodeFile(path)
-            holder.thumb.setImageBitmap(bmp)
-        } catch (_: Exception) {
-            holder.thumb.setImageDrawable(null)
+        if (isImagePath(path)) {
+            try {
+                val bmp = BitmapFactory.decodeFile(path)
+                holder.thumb.setImageBitmap(bmp)
+            } catch (_: Exception) {
+                holder.thumb.setImageResource(android.R.drawable.ic_menu_upload)
+            }
+        } else {
+            holder.thumb.setImageResource(android.R.drawable.ic_menu_upload)
         }
         holder.itemView.setOnClickListener { onItemClick(path) }
     }

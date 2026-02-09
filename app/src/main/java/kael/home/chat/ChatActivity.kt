@@ -8,11 +8,13 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.provider.OpenableColumns
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.view.View
+import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.ImageView
@@ -34,6 +36,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class ChatActivity : AppCompatActivity() {
+
+    companion object {
+        /** true когда чат на экране — уведомление о ответе не показываем */
+        var isChatOnScreen = false
+        /** ответ пришёл, пока чат был в фоне — при следующем onResume обновить список и проскроллить */
+        var pendingReplyFromBackground = false
+    }
+
     private lateinit var storage: StorageService
     private lateinit var recycler: RecyclerView
     private lateinit var input: EditText
@@ -51,11 +61,7 @@ class ChatActivity : AppCompatActivity() {
             if (intent?.action != kael.home.chat.service.KaelChatService.ACTION_REPLY_READY) return
             loading = false
             adapter.showTyping = false
-            adapter.notifyDataSetChanged()
-            messages.clear()
-            messages.addAll(storage.getMessages())
-            adapter.notifyDataSetChanged()
-            scrollToBottom()
+            refreshMessagesFromStorage()
             if (messages.isNotEmpty() && messages.last().role == "assistant") {
                 typingMessageIndex = messages.size - 1
                 typingLength = 0
@@ -64,11 +70,13 @@ class ChatActivity : AppCompatActivity() {
         }
     }
 
-    private val pickImageLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+    private val pickFileLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         uri ?: return@registerForActivityResult
         try {
+            val name = resolveFileName(uri) ?: "file_${System.currentTimeMillis()}"
+            val safeName = name.replace(Regex("[^a-zA-Z0-9._-]"), "_").ifEmpty { "file" }
             val dir = java.io.File(filesDir, "attachments").also { if (!it.exists()) it.mkdirs() }
-            val file = java.io.File(dir, "attach_${System.currentTimeMillis()}.jpg")
+            val file = java.io.File(dir, safeName)
             contentResolver.openInputStream(uri)?.use { input ->
                 file.outputStream().use { output -> input.copyTo(output) }
             }
@@ -77,6 +85,16 @@ class ChatActivity : AppCompatActivity() {
                 updatePendingAttachmentUi()
             }
         } catch (_: Exception) {}
+    }
+
+    private fun resolveFileName(uri: Uri): String? {
+        contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val idx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (idx >= 0) return cursor.getString(idx)
+            }
+        }
+        return uri.lastPathSegment
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -126,8 +144,16 @@ class ChatActivity : AppCompatActivity() {
         adapter.notifyDataSetChanged()
         scrollToBottom()
 
+        btnSend.isEnabled = true
         btnSend.setOnClickListener { send() }
-        btnAttach.setOnClickListener { pickImage() }
+        input.imeOptions = EditorInfo.IME_ACTION_SEND
+        input.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_SEND || actionId == EditorInfo.IME_ACTION_DONE) {
+                send()
+                true
+            } else false
+        }
+        btnAttach.setOnClickListener { pickFile() }
         findViewById<ImageButton>(R.id.btnRemoveAttachment).setOnClickListener {
             pendingAttachmentPath = null
             updatePendingAttachmentUi()
@@ -182,7 +208,22 @@ class ChatActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        isChatOnScreen = true
         registerReceiver(replyReceiver, IntentFilter(kael.home.chat.service.KaelChatService.ACTION_REPLY_READY), if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) Context.RECEIVER_NOT_EXPORTED else 0)
+        refreshMessagesFromStorage()
+        if (pendingReplyFromBackground) {
+            pendingReplyFromBackground = false
+            refreshMessagesFromStorage()
+            scrollToBottom()
+            if (messages.isNotEmpty() && messages.last().role == "assistant") {
+                typingMessageIndex = messages.size - 1
+                typingLength = 0
+                startTypingAnimation()
+            }
+        }
+    }
+
+    private fun refreshMessagesFromStorage() {
         messages.clear()
         messages.addAll(storage.getMessages())
         adapter.notifyDataSetChanged()
@@ -191,6 +232,7 @@ class ChatActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
+        isChatOnScreen = false
         try { unregisterReceiver(replyReceiver) } catch (_: Exception) {}
     }
 
@@ -247,25 +289,37 @@ class ChatActivity : AppCompatActivity() {
         }
     }
 
-    private fun pickImage() {
-        pickImageLauncher.launch("image/*")
+    private fun pickFile() {
+        pickFileLauncher.launch("*/*")
     }
 
     private fun updatePendingAttachmentUi() {
         val container = findViewById<LinearLayout>(R.id.pendingAttachmentContainer)
         val thumb = findViewById<ImageView>(R.id.pendingAttachmentThumb)
+        val nameView = findViewById<android.widget.TextView>(R.id.pendingAttachmentName)
         val path = pendingAttachmentPath
         if (path != null) {
             container.visibility = View.VISIBLE
+            val fileName = path.substringAfterLast('/')
+            nameView.text = fileName
+            nameView.visibility = View.VISIBLE
             try {
                 val bmp = BitmapFactory.decodeFile(path)
-                thumb.setImageBitmap(bmp)
+                if (bmp != null) {
+                    thumb.setImageBitmap(bmp)
+                    thumb.visibility = View.VISIBLE
+                } else {
+                    thumb.setImageResource(android.R.drawable.ic_menu_upload)
+                    thumb.visibility = View.VISIBLE
+                }
             } catch (_: Exception) {
-                thumb.setImageDrawable(null)
+                thumb.setImageResource(android.R.drawable.ic_menu_upload)
+                thumb.visibility = View.VISIBLE
             }
         } else {
             container.visibility = View.GONE
             thumb.setImageDrawable(null)
+            nameView.text = ""
         }
     }
 }

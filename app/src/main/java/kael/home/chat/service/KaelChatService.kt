@@ -26,7 +26,7 @@ class KaelChatService : Service() {
         val notif = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.app_name))
             .setContentText(getString(R.string.typing))
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(R.drawable.ic_launcher)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
@@ -44,22 +44,25 @@ class KaelChatService : Service() {
                 val reply = withContext(Dispatchers.IO) { api.sendChat(history) }
                 val assistantMsg = kael.home.chat.model.ChatMessage(role = "assistant", content = reply)
                 val updated = (history + assistantMsg).takeLast(StorageService.MAX_STORED)
-                storage.saveMessages(updated)
+                storage.saveMessagesSync(updated)
                 sendBroadcast(Intent(ACTION_REPLY_READY))
                 val open = PendingIntent.getActivity(
                     this@KaelChatService, 0,
                     Intent(this@KaelChatService, ChatActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
-                val doneNotif = NotificationCompat.Builder(this@KaelChatService, CHANNEL_ID)
-                    .setContentTitle("Kael")
-                    .setContentText(reply.take(80).let { if (it.length == 80) "$it…" else it })
-                    .setSmallIcon(android.R.drawable.ic_dialog_info)
-                    .setContentIntent(open)
-                    .setAutoCancel(true)
-                    .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-                    .build()
-                (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).notify(NOTIF_ID_DONE, doneNotif)
+                val showDoneNotif = !kael.home.chat.ChatActivity.isChatOnScreen
+                if (showDoneNotif) {
+                    val doneNotif = NotificationCompat.Builder(this@KaelChatService, CHANNEL_ID)
+                        .setContentTitle("Kael")
+                        .setContentText(reply.take(80).let { if (it.length == 80) "$it…" else it })
+                        .setSmallIcon(R.drawable.ic_launcher)
+                        .setContentIntent(open)
+                        .setAutoCancel(true)
+                        .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                        .build()
+                    (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).notify(NOTIF_ID_DONE, doneNotif)
+                }
             } catch (_: Exception) {
                 sendBroadcast(Intent(ACTION_REPLY_READY))
             }

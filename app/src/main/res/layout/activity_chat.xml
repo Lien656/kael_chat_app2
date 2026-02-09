@@ -51,6 +51,17 @@
                 android:background="@drawable/bg_bubble"
                 android:contentDescription="@null" />
 
+            <TextView
+                android:id="@+id/pendingAttachmentName"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:maxLines="2"
+                android:ellipsize="middle"
+                android:textColor="@color/text"
+                android:textSize="14sp" />
+
             <ImageButton
                 android:id="@+id/btnRemoveAttachment"
                 android:layout_width="40dp"
@@ -98,6 +109,10 @@
                 android:id="@+id/btnSend"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
+                android:minWidth="48dp"
+                android:minHeight="48dp"
+                android:clickable="true"
+                android:focusable="true"
                 android:background="@drawable/bg_send_button"
                 android:contentDescription="@null"
                 android:padding="8dp"

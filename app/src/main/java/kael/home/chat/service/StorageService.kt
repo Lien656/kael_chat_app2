@@ -57,6 +57,22 @@ class StorageService(context: Context) {
         saveChatLog(toSave)
     }
 
+    /** Сохранение синхронно (commit), чтобы после возврата из метода чат уже видел новые сообщения. */
+    fun saveMessagesSync(messages: List<ChatMessage>) {
+        val toSave = if (messages.size > MAX_STORED) messages.takeLast(MAX_STORED) else messages
+        val list = toSave.map { m ->
+            val map = m.toJson()
+            if (map.optString("content").length > MAX_CONTENT_LENGTH) {
+                map.put("content", map.optString("content").take(MAX_CONTENT_LENGTH))
+            }
+            map
+        }
+        val arr = JSONArray()
+        list.forEach { arr.put(it) }
+        prefs.edit().putString(KEY_MESSAGES, arr.toString()).commit()
+        saveChatLog(toSave)
+    }
+
     private fun saveChatLog(messages: List<ChatMessage>) {
         try {
             val file = File(appContext.filesDir, "chat_log.txt")

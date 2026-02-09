@@ -10,6 +10,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import android.util.Base64
 import java.io.File
+import java.nio.charset.Charset
 import java.util.concurrent.TimeUnit
 
 class ApiService(private val apiKey: String, private val apiBase: String) {
@@ -47,21 +48,40 @@ class ApiService(private val apiKey: String, private val apiBase: String) {
         }
     }
 
+    private val maxTextFileBytes = 150_000
+
     private fun buildMessageContent(m: ChatMessage): Any {
-        if (m.role != "user" || m.attachmentPath == null || !isImagePath(m.attachmentPath)) {
-            return m.content
-        }
+        if (m.role != "user" || m.attachmentPath == null) return m.content
         val file = File(m.attachmentPath!!)
         if (!file.exists()) return m.content
-        val bytes = file.readBytes()
-        val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
-        val mime = mimeForPath(m.attachmentPath!!)
-        val contentArr = JSONArray()
-        if (m.content.trim().isNotEmpty()) {
-            contentArr.put(JSONObject().put("type", "text").put("text", m.content))
+        if (isImagePath(m.attachmentPath)) {
+            val bytes = file.readBytes()
+            val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
+            val mime = mimeForPath(m.attachmentPath!!)
+            val contentArr = JSONArray()
+            if (m.content.trim().isNotEmpty()) {
+                contentArr.put(JSONObject().put("type", "text").put("text", m.content))
+            }
+            contentArr.put(JSONObject().put("type", "image_url").put("image_url", JSONObject().put("url", "data:$mime;base64,$base64")))
+            return contentArr
         }
-        contentArr.put(JSONObject().put("type", "image_url").put("image_url", JSONObject().put("url", "data:$mime;base64,$base64")))
-        return contentArr
+        val fileContent = readTextFileSafe(file)
+        val name = file.name
+        val prefix = if (m.content.trim().isNotEmpty()) "${m.content}\n\n" else ""
+        return prefix + "Содержимое файла «$name»:\n$fileContent"
+    }
+
+    private fun readTextFileSafe(file: File): String {
+        return try {
+            val bytes = file.readBytes()
+            if (bytes.size > maxTextFileBytes) {
+                String(bytes, 0, maxTextFileBytes, Charset.forName("UTF-8")) + "\n… (файл обрезан)"
+            } else {
+                String(bytes, Charset.forName("UTF-8"))
+            }
+        } catch (_: Exception) {
+            "(не удалось прочитать как текст)"
+        }
     }
 
     fun checkApiConnection(): String? {

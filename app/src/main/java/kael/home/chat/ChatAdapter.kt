@@ -125,18 +125,34 @@ class ChatAdapter(
         private val text: TextView = itemView.findViewById(R.id.messageText)
         private val attachment: ImageView = itemView.findViewById(R.id.messageAttachment)
 
+        private fun isImagePath(path: String): Boolean {
+            val lower = path.lowercase()
+            return lower.endsWith(".jpg") || lower.endsWith(".jpeg") ||
+                lower.endsWith(".png") || lower.endsWith(".gif") || lower.endsWith(".webp")
+        }
+
         fun bind(displayName: String, displayText: String, fullText: String, attachmentPath: String?, timestamp: Long) {
             name.text = displayName
             time.text = formatTime(timestamp)
-            text.text = displayText
+            val fileName = attachmentPath?.substringAfterLast('/') ?: ""
+            val showAsFileOnly = displayText == "(файл)" && fileName.isNotEmpty()
+            text.text = if (showAsFileOnly) "📎 $fileName" else displayText
             text.alpha = 1f
             if (!attachmentPath.isNullOrEmpty()) {
-                try {
-                    val bmp = BitmapFactory.decodeFile(attachmentPath)
-                    attachment.setImageBitmap(bmp)
-                    attachment.visibility = View.VISIBLE
-                } catch (_: Exception) {
-                    attachment.visibility = View.GONE
+                attachment.visibility = View.VISIBLE
+                if (isImagePath(attachmentPath)) {
+                    try {
+                        val bmp = BitmapFactory.decodeFile(attachmentPath)
+                        if (bmp != null) {
+                            attachment.setImageBitmap(bmp)
+                        } else {
+                            attachment.setImageResource(android.R.drawable.ic_menu_upload)
+                        }
+                    } catch (_: Exception) {
+                        attachment.setImageResource(android.R.drawable.ic_menu_upload)
+                    }
+                } else {
+                    attachment.setImageResource(android.R.drawable.ic_menu_upload)
                 }
             } else {
                 attachment.visibility = View.GONE
