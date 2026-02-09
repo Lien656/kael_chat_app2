@@ -48,7 +48,7 @@ class ApiService(private val apiKey: String, private val apiBase: String) {
         }
     }
 
-    private val maxTextFileBytes = 12_000
+    private val maxTextFileBytes = 8_000
 
     private fun buildMessageContent(m: ChatMessage): Any {
         return try {
@@ -131,10 +131,13 @@ class ApiService(private val apiKey: String, private val apiBase: String) {
         }
         systemContent += "\n\n[Чтобы сохранить что-то в память (идеи о себе, выводы из файлов), напиши в ответе блок [ЗАПОМНИ: твой текст]. Он не покажется в чате — только сохранится. Делай это только если хочешь.]"
         messages.put(JSONObject().put("role", "system").put("content", systemContent))
-        val recent = if (history.size > MAX_HISTORY) history.takeLast(MAX_HISTORY) else history
+        val recent = history.takeLast(MAX_MESSAGES_PER_REQUEST)
         for (m in recent) {
             val role = m.role
-            val content = buildMessageContent(m)
+            var content = buildMessageContent(m)
+            if (content is String && content.length > MAX_CONTENT_CHARS_PER_MESSAGE) {
+                content = content.take(MAX_CONTENT_CHARS_PER_MESSAGE) + "\n… (обрезано)"
+            }
             messages.put(JSONObject().put("role", role).put("content", content))
         }
         val body = JSONObject()
@@ -188,5 +191,7 @@ class ApiService(private val apiKey: String, private val apiBase: String) {
         private const val MODEL_PRIMARY = "gpt-4o"
         private const val MODEL_FALLBACK = "gpt-4o-mini"
         private const val MAX_HISTORY = 4000
+        private const val MAX_MESSAGES_PER_REQUEST = 24
+        private const val MAX_CONTENT_CHARS_PER_MESSAGE = 4000
     }
 }
