@@ -213,6 +213,7 @@ class ChatActivity : AppCompatActivity() {
         isChatOnScreen = true
         onReplyReady = {
             runOnUiThread {
+                if (isFinishing) return@runOnUiThread
                 loading = false
                 adapter.showTyping = false
                 refreshMessagesFromStorage()

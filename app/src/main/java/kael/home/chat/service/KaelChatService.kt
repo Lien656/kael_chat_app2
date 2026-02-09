@@ -48,13 +48,14 @@ class KaelChatService : Service() {
                 val key = storage.apiKey ?: return@launch
                 val api = ApiService(key, storage.apiBase)
                 val history = storage.getMessages()
-                val kaelMemory = storage.getKaelMemory()
+                val kaelMemory = storage.getKaelMemory().take(8000)
                 var reply = withContext(Dispatchers.IO) { api.sendChat(history, kaelMemory) }
                 val memoryBlock = Regex("\\[ЗАПОМНИ:\\s*([\\s\\S]*?)\\]").find(reply)
                 if (memoryBlock != null) {
                     val toRemember = memoryBlock.groupValues.getOrNull(1)?.trim() ?: ""
                     if (toRemember.isNotEmpty()) storage.appendToKaelMemory(toRemember)
-                    reply = reply.replace(memoryBlock.value, "").trim().replace(Regex("\\n{3,}"), "\n\n")
+                    val stripped = reply.replace(memoryBlock.value, "").trim().replace(Regex("\\n{3,}"), "\n\n")
+                    if (stripped.isNotEmpty()) reply = stripped
                 }
                 val assistantMsg = kael.home.chat.model.ChatMessage(role = "assistant", content = reply)
                 val updated = (history + assistantMsg).takeLast(StorageService.MAX_STORED)
@@ -76,12 +77,21 @@ class KaelChatService : Service() {
                         .build()
                     (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).notify(NOTIF_ID_DONE, doneNotif)
                 }
-            } catch (_: Exception) {
-                /* ответ не получен — ниже всегда шлём broadcast */
+            } catch (e: Exception) {
+                try {
+                    val storageErr = StorageService(this@KaelChatService)
+                    val errMsg = (e.message ?: "Ошибка").take(200)
+                    val history = storageErr.getMessages()
+                    val assistantMsg = kael.home.chat.model.ChatMessage(role = "assistant", content = "Ошибка: $errMsg")
+                    val updated = (history + assistantMsg).takeLast(StorageService.MAX_STORED)
+                    storageErr.saveMessagesSync(updated)
+                } catch (_: Exception) {}
             } finally {
                 sendBroadcast(Intent(ACTION_REPLY_READY))
                 Handler(Looper.getMainLooper()).post {
-                    ChatActivity.onReplyReady?.invoke()
+                    try {
+                        ChatActivity.onReplyReady?.invoke()
+                    } catch (_: Exception) {}
                 }
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf(startId)
