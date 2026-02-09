@@ -48,7 +48,7 @@ class ApiService(private val apiKey: String, private val apiBase: String) {
         }
     }
 
-    private val maxTextFileBytes = 150_000
+    private val maxTextFileBytes = 12_000
 
     private fun buildMessageContent(m: ChatMessage): Any {
         return try {
