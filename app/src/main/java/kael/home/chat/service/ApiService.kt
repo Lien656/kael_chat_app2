@@ -65,7 +65,7 @@ class ApiService(private val apiKey: String, private val apiBase: String) {
                 if (userText.isNotEmpty() && userText != "(файл)") {
                     contentArr.put(JSONObject().put("type", "text").put("text", userText))
                 } else {
-                    contentArr.put(JSONObject().put("type", "text").put("text", "Пользователь отправил это изображение. Опиши, что на нём видно — текст, объекты, сцену — и ответь по существу."))
+                    contentArr.put(JSONObject().put("type", "text").put("text", "Пользователь отправил изображение (рисунок, арт или скриншот). Ты обязан его просмотреть и описать: кто и что на нём — персонажи, люди, робот, сцена, текст. Не отказывайся и не пиши «не умею анализировать». Опиши содержимое и ответь по существу."))
                 }
                 val imageUrlObj = JSONObject().put("url", "data:$mime;base64,$base64").put("detail", "high")
                 contentArr.put(JSONObject().put("type", "image_url").put("image_url", imageUrlObj))
