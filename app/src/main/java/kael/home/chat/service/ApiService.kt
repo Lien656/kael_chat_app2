@@ -51,27 +51,33 @@ class ApiService(private val apiKey: String, private val apiBase: String) {
     private val maxTextFileBytes = 150_000
 
     private fun buildMessageContent(m: ChatMessage): Any {
-        if (m.role != "user" || m.attachmentPath == null) return m.content
-        val file = File(m.attachmentPath!!)
-        if (!file.exists()) return m.content
-        if (isImagePath(m.attachmentPath)) {
-            val bytes = file.readBytes()
-            val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
-            val mime = mimeForPath(m.attachmentPath!!)
-            val contentArr = JSONArray()
-            if (m.content.trim().isNotEmpty()) {
-                contentArr.put(JSONObject().put("type", "text").put("text", m.content))
+        return try {
+            if (m.role != "user" || m.attachmentPath == null) return m.content
+            val file = File(m.attachmentPath!!)
+            if (!file.exists()) return m.content
+            if (isImagePath(m.attachmentPath)) {
+                val bytes = file.readBytes()
+                if (bytes.size > 4_000_000) return m.content + " [изображение слишком большое]"
+                val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
+                val mime = mimeForPath(m.attachmentPath!!)
+                val contentArr = JSONArray()
+                if (m.content.trim().isNotEmpty()) {
+                    contentArr.put(JSONObject().put("type", "text").put("text", m.content))
+                }
+                contentArr.put(JSONObject().put("type", "image_url").put("image_url", JSONObject().put("url", "data:$mime;base64,$base64")))
+                contentArr
+            } else {
+                val name = file.name
+                val fileContent = readTextFileSafe(file)
+                val prefix = if (m.content.trim().isNotEmpty()) "${m.content}\n\n" else ""
+                return if (fileContent == null) {
+                    prefix + "Прикреплён файл: $name (фото/видео/другой бинарный файл)."
+                } else {
+                    prefix + "Содержимое файла «$name»:\n$fileContent"
+                }
             }
-            contentArr.put(JSONObject().put("type", "image_url").put("image_url", JSONObject().put("url", "data:$mime;base64,$base64")))
-            return contentArr
-        }
-        val name = file.name
-        val fileContent = readTextFileSafe(file)
-        val prefix = if (m.content.trim().isNotEmpty()) "${m.content}\n\n" else ""
-        return if (fileContent == null) {
-            prefix + "Прикреплён файл: $name (фото/видео/другой бинарный файл)."
-        } else {
-            prefix + "Содержимое файла «$name»:\n$fileContent"
+        } catch (_: Exception) {
+            m.content
         }
     }
 

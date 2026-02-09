@@ -12,17 +12,20 @@ import kael.home.chat.ChatActivity
 import kael.home.chat.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class KaelChatService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private var requestJob: Job? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         createChannel()
+        requestJob?.cancel()
         val showOngoingNotif = !ChatActivity.isChatOnScreen
         val notif = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.app_name))
@@ -37,7 +40,7 @@ class KaelChatService : Service() {
         } else {
             startForeground(NOTIF_ID, notif)
         }
-        scope.launch {
+        requestJob = scope.launch {
             try {
                 val storage = StorageService(this@KaelChatService)
                 val key = storage.apiKey ?: return@launch
@@ -47,7 +50,6 @@ class KaelChatService : Service() {
                 val assistantMsg = kael.home.chat.model.ChatMessage(role = "assistant", content = reply)
                 val updated = (history + assistantMsg).takeLast(StorageService.MAX_STORED)
                 storage.saveMessagesSync(updated)
-                sendBroadcast(Intent(ACTION_REPLY_READY))
                 val open = PendingIntent.getActivity(
                     this@KaelChatService, 0,
                     Intent(this@KaelChatService, ChatActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
@@ -66,10 +68,12 @@ class KaelChatService : Service() {
                     (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).notify(NOTIF_ID_DONE, doneNotif)
                 }
             } catch (_: Exception) {
+                /* ответ не получен — ниже всегда шлём broadcast */
+            } finally {
                 sendBroadcast(Intent(ACTION_REPLY_READY))
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf(startId)
             }
-            stopForeground(STOP_FOREGROUND_REMOVE)
-            stopSelf(startId)
         }
         return START_NOT_STICKY
     }
