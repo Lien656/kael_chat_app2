@@ -61,10 +61,14 @@ class ApiService(private val apiKey: String, private val apiBase: String) {
                 val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
                 val mime = mimeForPath(m.attachmentPath!!)
                 val contentArr = JSONArray()
-                if (m.content.trim().isNotEmpty()) {
-                    contentArr.put(JSONObject().put("type", "text").put("text", m.content))
+                val userText = m.content.trim()
+                if (userText.isNotEmpty() && userText != "(файл)") {
+                    contentArr.put(JSONObject().put("type", "text").put("text", userText))
+                } else {
+                    contentArr.put(JSONObject().put("type", "text").put("text", "Пользователь отправил это изображение. Опиши, что на нём видно — текст, объекты, сцену — и ответь по существу."))
                 }
-                contentArr.put(JSONObject().put("type", "image_url").put("image_url", JSONObject().put("url", "data:$mime;base64,$base64")))
+                val imageUrlObj = JSONObject().put("url", "data:$mime;base64,$base64").put("detail", "high")
+                contentArr.put(JSONObject().put("type", "image_url").put("image_url", imageUrlObj))
                 contentArr
             } else {
                 val name = file.name
