@@ -65,13 +65,17 @@ class ApiService(private val apiKey: String, private val apiBase: String) {
             contentArr.put(JSONObject().put("type", "image_url").put("image_url", JSONObject().put("url", "data:$mime;base64,$base64")))
             return contentArr
         }
-        val fileContent = readTextFileSafe(file)
         val name = file.name
+        val fileContent = readTextFileSafe(file)
         val prefix = if (m.content.trim().isNotEmpty()) "${m.content}\n\n" else ""
-        return prefix + "Содержимое файла «$name»:\n$fileContent"
+        return if (fileContent == null) {
+            prefix + "Прикреплён файл: $name (фото/видео/другой бинарный файл)."
+        } else {
+            prefix + "Содержимое файла «$name»:\n$fileContent"
+        }
     }
 
-    private fun readTextFileSafe(file: File): String {
+    private fun readTextFileSafe(file: File): String? {
         return try {
             val bytes = file.readBytes()
             if (bytes.size > maxTextFileBytes) {
@@ -80,7 +84,7 @@ class ApiService(private val apiKey: String, private val apiBase: String) {
                 String(bytes, Charset.forName("UTF-8"))
             }
         } catch (_: Exception) {
-            "(не удалось прочитать как текст)"
+            null
         }
     }
 
