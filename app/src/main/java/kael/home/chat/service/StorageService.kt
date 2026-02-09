@@ -73,6 +73,27 @@ class StorageService(context: Context) {
         saveChatLog(toSave)
     }
 
+    private val kaelMemoryFile: File get() = File(appContext.filesDir, FILE_KAEL_MEMORY)
+
+    fun getKaelMemory(): String {
+        return try {
+            if (kaelMemoryFile.exists()) kaelMemoryFile.readText(Charsets.UTF_8).trim() else ""
+        } catch (_: Exception) {
+            ""
+        }
+    }
+
+    fun appendKaelMemory(text: String) {
+        if (text.isBlank()) return
+        try {
+            val current = getKaelMemory()
+            val line = text.trim().replace("\n", " ")
+            val appended = if (current.isEmpty()) line else "$current\n$line"
+            val capped = if (appended.length > MAX_KAEL_MEMORY_CHARS) appended.takeLast(MAX_KAEL_MEMORY_CHARS) else appended
+            kaelMemoryFile.writeText(capped, Charsets.UTF_8)
+        } catch (_: Exception) {}
+    }
+
     private fun saveChatLog(messages: List<ChatMessage>) {
         try {
             val file = File(appContext.filesDir, "chat_log.txt")
@@ -97,5 +118,7 @@ class StorageService(context: Context) {
         private const val DEFAULT_API_BASE = "https://api.openai.com/v1"
         const val MAX_STORED = 4000
         private const val MAX_CONTENT_LENGTH = 8000
+        private const val FILE_KAEL_MEMORY = "kael_memory.txt"
+        private const val MAX_KAEL_MEMORY_CHARS = 80_000
     }
 }

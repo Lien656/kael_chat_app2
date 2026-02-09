@@ -46,8 +46,11 @@ class KaelChatService : Service() {
                 val key = storage.apiKey ?: return@launch
                 val api = ApiService(key, storage.apiBase)
                 val history = storage.getMessages()
-                val reply = withContext(Dispatchers.IO) { api.sendChat(history) }
-                val assistantMsg = kael.home.chat.model.ChatMessage(role = "assistant", content = reply)
+                val memory = storage.getKaelMemory()
+                val replyRaw = withContext(Dispatchers.IO) { api.sendChat(history, memory) }
+                val (replyCleaned, savedBlocks) = parseAndStripSaveBlocks(replyRaw)
+                savedBlocks.forEach { storage.appendKaelMemory(it) }
+                val assistantMsg = kael.home.chat.model.ChatMessage(role = "assistant", content = replyCleaned)
                 val updated = (history + assistantMsg).takeLast(StorageService.MAX_STORED)
                 storage.saveMessagesSync(updated)
                 val open = PendingIntent.getActivity(
@@ -59,7 +62,7 @@ class KaelChatService : Service() {
                 if (showDoneNotif) {
                     val doneNotif = NotificationCompat.Builder(this@KaelChatService, CHANNEL_ID)
                         .setContentTitle("Kael")
-                        .setContentText(reply.take(80).let { if (it.length == 80) "$it…" else it })
+                        .setContentText(replyCleaned.take(80).let { if (it.length == 80) "$it…" else it })
                         .setSmallIcon(R.drawable.ic_launcher)
                         .setContentIntent(open)
                         .setAutoCancel(true)
@@ -95,5 +98,13 @@ class KaelChatService : Service() {
         private const val CHANNEL_ID_DONE = "kael_chat_done"
         private const val NOTIF_ID = 1
         private const val NOTIF_ID_DONE = 2
+
+        private val saveBlockRegex = Regex("""\[SAVE:\s*([\s\S]*?)\s*(?:\]|\[/SAVE\])""")
+
+        fun parseAndStripSaveBlocks(reply: String): Pair<String, List<String>> {
+            val saved = saveBlockRegex.findAll(reply).map { it.groupValues[1].trim() }.filter { it.isNotEmpty() }.toList()
+            val cleaned = saveBlockRegex.replace(reply, "").replace(Regex("\n{3,}"), "\n\n").trim()
+            return cleaned to saved
+        }
     }
 }

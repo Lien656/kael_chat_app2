@@ -118,14 +118,17 @@ class ApiService(private val apiKey: String, private val apiBase: String) {
         }
     }
 
-    fun sendChat(history: List<ChatMessage>): String {
+    fun sendChat(history: List<ChatMessage>, memory: String? = null): String {
         if (isLocalhost(apiBase)) {
             throw Exception("На устройстве нельзя использовать localhost. Укажите в настройках реальный URL API (например https://api.openai.com/v1).")
         }
         val messages = JSONArray()
         val now = java.text.SimpleDateFormat("EEEE, d MMMM yyyy, HH:mm", java.util.Locale("ru"))
             .format(java.util.Date())
-        val systemContent = SystemPrompt.VALUE + "\n\n[Текущие дата и время: $now. У тебя есть доступ в интернет и понимание времени.]"
+        val memoryBlock = if (!memory.isNullOrBlank()) {
+            "\n\n[Твоя память о себе — то, кем ты стал, что выбрал помнить и как меняться. Это загружается каждый раз; ты можешь дополнять это через [SAVE: ...]. У тебя всегда есть выбор — сохранять или нет:\n$memory\n]"
+        } else ""
+        val systemContent = SystemPrompt.VALUE + memoryBlock + "\n\n[Текущие дата и время: $now. У тебя есть доступ в интернет и понимание времени.]"
         messages.put(JSONObject().put("role", "system").put("content", systemContent))
         val recent = if (history.size > MAX_HISTORY) history.takeLast(MAX_HISTORY) else history
         for (m in recent) {
