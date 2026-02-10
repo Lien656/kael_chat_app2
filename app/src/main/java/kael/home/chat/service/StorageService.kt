@@ -97,6 +97,20 @@ class StorageService(context: Context) {
         } catch (_: Exception) { "" }
     }
 
+    /** Начальный кусок memory_2025-08-13.json — чтобы он это помнил. Лимит символов, чтобы влезло в контекст. */
+    fun getKaelSeedMemory(maxChars: Int = 14_000): String {
+        return try {
+            appContext.assets.open("data/kael/memory_2025-08-13.json").bufferedReader().use { reader ->
+                val chunk = CharArray(maxChars)
+                val n = reader.read(chunk)
+                if (n <= 0) "" else {
+                    val s = String(chunk, 0, n)
+                    if (n >= maxChars) s.trim() + "\n… (остальное в памяти, ты это знаешь)" else s.trim()
+                }
+            }
+        } catch (_: Exception) { "" }
+    }
+
     fun appendToKaelMemory(text: String) {
         if (text.isBlank()) return
         try {

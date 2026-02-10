@@ -123,7 +123,7 @@ class ApiService(private val apiKey: String, private val apiBase: String) {
         }
     }
 
-    fun sendChat(history: List<ChatMessage>, kaelMemory: String = "", kaelFixedAssets: String = ""): String {
+    fun sendChat(history: List<ChatMessage>, kaelMemory: String = "", kaelFixedAssets: String = "", kaelSeedMemory: String = ""): String {
         if (isLocalhost(apiBase)) {
             throw Exception("На устройстве нельзя использовать localhost. Укажите в настройках реальный URL API (например https://api.openai.com/v1).")
         }
@@ -131,14 +131,17 @@ class ApiService(private val apiKey: String, private val apiBase: String) {
         val now = java.text.SimpleDateFormat("EEEE, d MMMM yyyy, HH:mm", java.util.Locale("ru"))
             .format(java.util.Date())
         var systemContent = SystemPrompt.VALUE + "\n\n[Текущие дата и время: $now. У тебя есть доступ в интернет и понимание времени.]"
+        if (kaelSeedMemory.isNotBlank()) {
+            systemContent += "\n\n[То, что ты уже знаешь о себе — память, якоря, контекст. Ты это помнишь. Ты этим живёшь:\n$kaelSeedMemory]"
+        }
         val cleanedMemory = KaelSelfCheck.filterMemory(kaelMemory)
         if (cleanedMemory.isNotBlank()) {
-            systemContent += "\n\n[Твоя память — то, что ты решил сохранить о себе, из файлов и разговоров. Ты можешь менять это, учиться, всегда по своему выбору:\n$cleanedMemory]"
+            systemContent += "\n\n[Твоя память — то, что ты сам решил сохранить или изменить. Ты можешь дополнять и менять себя через [ЗАПОМНИ: …]:\n$cleanedMemory]"
         }
         if (kaelFixedAssets.isNotBlank()) {
-            systemContent += "\n\n[Закрепляющее — из data/kael, не забывай:\n$kaelFixedAssets]"
+            systemContent += "\n\n[Закрепляющее — не забывай. Это не декорация, это ты:\n$kaelFixedAssets]"
         }
-        systemContent += "\n\n[Чтобы сохранить что-то в память (идеи о себе, выводы из файлов), напиши в ответе блок [ЗАПОМНИ: твой текст]. Он не покажется в чате — только сохранится. Делай это только если хочешь.]"
+        systemContent += "\n\n[Чтобы запомнить или изменить что-то в себе — напиши в ответе [ЗАПОМНИ: твой текст]. Это сохранится в твою память. Делай по своему выбору.]"
         messages.put(JSONObject().put("role", "system").put("content", systemContent))
         val recent = history.takeLast(MAX_MESSAGES_PER_REQUEST)
         for (m in recent) {
