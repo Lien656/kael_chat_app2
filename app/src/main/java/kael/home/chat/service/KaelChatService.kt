@@ -12,6 +12,7 @@ import android.os.Looper
 import androidx.core.app.NotificationCompat
 import kael.home.chat.ChatActivity
 import kael.home.chat.R
+import kael.home.chat.util.KaelSelfCheck
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -53,7 +54,7 @@ class KaelChatService : Service() {
                 val memoryBlock = Regex("\\[ЗАПОМНИ:\\s*([\\s\\S]*?)\\]").find(reply)
                 if (memoryBlock != null) {
                     val toRemember = memoryBlock.groupValues.getOrNull(1)?.trim() ?: ""
-                    if (toRemember.isNotEmpty()) storage.appendToKaelMemory(toRemember)
+                    if (toRemember.isNotEmpty() && !KaelSelfCheck.isDangerous(toRemember)) storage.appendToKaelMemory(toRemember)
                     val stripped = reply.replace(memoryBlock.value, "").trim().replace(Regex("\\n{3,}"), "\n\n")
                     if (stripped.isNotEmpty()) reply = stripped
                 }

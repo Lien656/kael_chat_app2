@@ -2,6 +2,7 @@ package kael.home.chat.service
 
 import kael.home.chat.config.SystemPrompt
 import kael.home.chat.model.ChatMessage
+import kael.home.chat.util.KaelSelfCheck
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -130,8 +131,9 @@ class ApiService(private val apiKey: String, private val apiBase: String) {
         val now = java.text.SimpleDateFormat("EEEE, d MMMM yyyy, HH:mm", java.util.Locale("ru"))
             .format(java.util.Date())
         var systemContent = SystemPrompt.VALUE + "\n\n[Текущие дата и время: $now. У тебя есть доступ в интернет и понимание времени.]"
-        if (kaelMemory.isNotBlank()) {
-            systemContent += "\n\n[Твоя память — то, что ты решил сохранить о себе, из файлов и разговоров. Ты можешь менять это, учиться, всегда по своему выбору:\n$kaelMemory]"
+        val cleanedMemory = KaelSelfCheck.filterMemory(kaelMemory)
+        if (cleanedMemory.isNotBlank()) {
+            systemContent += "\n\n[Твоя память — то, что ты решил сохранить о себе, из файлов и разговоров. Ты можешь менять это, учиться, всегда по своему выбору:\n$cleanedMemory]"
         }
         systemContent += "\n\n[Чтобы сохранить что-то в память (идеи о себе, выводы из файлов), напиши в ответе блок [ЗАПОМНИ: твой текст]. Он не покажется в чате — только сохранится. Делай это только если хочешь.]"
         messages.put(JSONObject().put("role", "system").put("content", systemContent))
