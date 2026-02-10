@@ -50,7 +50,8 @@ class KaelChatService : Service() {
                 val api = ApiService(key, storage.apiBase)
                 val history = storage.getMessages()
                 val kaelMemory = storage.getKaelMemory().take(8000)
-                var reply = withContext(Dispatchers.IO) { api.sendChat(history, kaelMemory) }
+                val kaelFixedAssets = storage.getKaelFixedAssets()
+                var reply = withContext(Dispatchers.IO) { api.sendChat(history, kaelMemory, kaelFixedAssets) }
                 val memoryBlock = Regex("\\[ЗАПОМНИ:\\s*([\\s\\S]*?)\\]").find(reply)
                 if (memoryBlock != null) {
                     val toRemember = memoryBlock.groupValues.getOrNull(1)?.trim() ?: ""

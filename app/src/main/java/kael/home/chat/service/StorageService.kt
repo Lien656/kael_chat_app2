@@ -81,6 +81,22 @@ class StorageService(context: Context) {
         }
     }
 
+    /** Текст из assets/data/kael/ (night_breath, identity, origin) — подставляется в системный промпт. */
+    fun getKaelFixedAssets(): String {
+        return try {
+            val paths = listOf(
+                "data/kael/night_breath.txt",
+                "data/kael/kael_identity.lock",
+                "data/kael/kael_origin.txt"
+            )
+            paths.mapNotNull { path ->
+                try {
+                    appContext.assets.open(path).bufferedReader().use { it.readText() }.trim()
+                } catch (_: Exception) { null }
+            }.filter { it.isNotEmpty() }.joinToString("\n\n---\n\n")
+        } catch (_: Exception) { "" }
+    }
+
     fun appendToKaelMemory(text: String) {
         if (text.isBlank()) return
         try {

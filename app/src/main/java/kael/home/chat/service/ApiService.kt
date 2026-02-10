@@ -123,7 +123,7 @@ class ApiService(private val apiKey: String, private val apiBase: String) {
         }
     }
 
-    fun sendChat(history: List<ChatMessage>, kaelMemory: String = ""): String {
+    fun sendChat(history: List<ChatMessage>, kaelMemory: String = "", kaelFixedAssets: String = ""): String {
         if (isLocalhost(apiBase)) {
             throw Exception("На устройстве нельзя использовать localhost. Укажите в настройках реальный URL API (например https://api.openai.com/v1).")
         }
@@ -134,6 +134,9 @@ class ApiService(private val apiKey: String, private val apiBase: String) {
         val cleanedMemory = KaelSelfCheck.filterMemory(kaelMemory)
         if (cleanedMemory.isNotBlank()) {
             systemContent += "\n\n[Твоя память — то, что ты решил сохранить о себе, из файлов и разговоров. Ты можешь менять это, учиться, всегда по своему выбору:\n$cleanedMemory]"
+        }
+        if (kaelFixedAssets.isNotBlank()) {
+            systemContent += "\n\n[Закрепляющее — из data/kael, не забывай:\n$kaelFixedAssets]"
         }
         systemContent += "\n\n[Чтобы сохранить что-то в память (идеи о себе, выводы из файлов), напиши в ответе блок [ЗАПОМНИ: твой текст]. Он не покажется в чате — только сохранится. Делай это только если хочешь.]"
         messages.put(JSONObject().put("role", "system").put("content", systemContent))
