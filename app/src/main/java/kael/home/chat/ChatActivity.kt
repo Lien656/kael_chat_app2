@@ -162,10 +162,17 @@ class ChatActivity : AppCompatActivity() {
         }
         updatePendingAttachmentUi()
         toolbar.setOnMenuItemClickListener { item ->
-            if (item.itemId == R.id.settings) {
-                startActivity(Intent(this, SettingsActivity::class.java))
-                true
-            } else false
+            when (item.itemId) {
+                R.id.menu_api_key -> {
+                    startActivity(Intent(this, ApiKeyActivity::class.java))
+                    true
+                }
+                R.id.settings -> {
+                    startActivity(Intent(this, SettingsActivity::class.java))
+                    true
+                }
+                else -> false
+            }
         }
     }
 
