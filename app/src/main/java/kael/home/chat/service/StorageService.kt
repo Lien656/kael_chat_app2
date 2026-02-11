@@ -73,6 +73,7 @@ class StorageService(context: Context) {
         saveChatLog(toSave)
     }
 
+    /** Память Каэля: то, что он сам сохранил через [ЗАПОМНИ: …] в ответе. Отдаётся в каждый API-запрос — он это реально помнит. */
     fun getKaelMemory(): String {
         return try {
             File(appContext.filesDir, "kael_memory.txt").readText(Charsets.UTF_8).trim()
@@ -119,6 +120,7 @@ class StorageService(context: Context) {
         } catch (_: Exception) {}
     }
 
+    /** Самоизменение: Каэль пишет в ответе [ЗАПОМНИ: текст] — мы сохраняем сюда. Так он сам решает, что запомнить и как меняться. */
     fun appendToKaelMemory(text: String) {
         if (text.isBlank()) return
         try {

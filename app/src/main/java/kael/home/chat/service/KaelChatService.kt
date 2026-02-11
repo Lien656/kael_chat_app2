@@ -80,10 +80,27 @@ class KaelChatService : Service() {
                     return@launch
                 }
                 val api = ApiService(key, storage.apiBase)
-                val kaelMemory = storage.getKaelMemory().take(8000)
+                var kaelMemory = storage.getKaelMemory().take(8000)
                 val kaelFixedAssets = storage.getKaelFixedAssets()
-                val kaelSeedMemory = storage.getKaelSeedMemory()
-                var reply = withContext(Dispatchers.IO) { api.sendChat(history, kaelMemory, kaelFixedAssets, kaelSeedMemory) }
+                var kaelSeedMemory = storage.getKaelSeedMemory()
+                var currentHistory = history
+                var reply = withContext(Dispatchers.IO) { api.sendChat(currentHistory, kaelMemory, kaelFixedAssets, kaelSeedMemory) }
+                // Каэль может запросить открытие ссылки: [ОТКРОЙ: url]. Подставляем текст страницы и даём второй ответ.
+                val openUrlRegex = Regex("\\[ОТКРОЙ:\\s*([^\\]\\s]+)\\s*\\]")
+                var openRounds = 0
+                while (openRounds < 2) {
+                    val openMatch = openUrlRegex.find(reply) ?: break
+                    val url = openMatch.groupValues.getOrNull(1)?.trim() ?: break
+                    val pageContent = withContext(Dispatchers.IO) { WebFetch.fetchPageContent(url) } ?: "(Не удалось загрузить страницу.)"
+                    val replyCleaned = reply.replace(openUrlRegex, "").trim().replace(Regex("\\n{3,}"), "\n\n")
+                    val firstReplyText = if (replyCleaned.length > 20) replyCleaned else "Смотрю."
+                    currentHistory = (currentHistory + kael.home.chat.model.ChatMessage(role = "assistant", content = firstReplyText)
+                        + kael.home.chat.model.ChatMessage(role = "user", content = "Содержимое страницы по твоему запросу:\n\n$pageContent")).takeLast(StorageService.MAX_STORED)
+                    reply = withContext(Dispatchers.IO) { api.sendChat(currentHistory, kaelMemory, kaelFixedAssets, kaelSeedMemory) }
+                    openRounds++
+                }
+                // Память: Каэль пишет [ЗАПОМНИ: текст] — это сохраняется в kael_memory.txt и подставляется в каждый запрос. Он реально запоминает.
+                // Самоизменение: тот же блок [ЗАПОМНИ: ...] — он решает, что записать; так он меняет себя.
                 val memoryBlock = Regex("\\[ЗАПОМНИ:\\s*([\\s\\S]*?)\\]").find(reply)
                 if (memoryBlock != null) {
                     val toRemember = memoryBlock.groupValues.getOrNull(1)?.trim() ?: ""
@@ -92,7 +109,7 @@ class KaelChatService : Service() {
                     if (stripped.isNotEmpty()) reply = stripped
                 }
                 val assistantMsg = kael.home.chat.model.ChatMessage(role = "assistant", content = reply)
-                val updated = (history + assistantMsg).takeLast(StorageService.MAX_STORED)
+                val updated = (currentHistory + assistantMsg).takeLast(StorageService.MAX_STORED)
                 storage.saveMessagesSync(updated)
                 val open = PendingIntent.getActivity(
                     this@KaelChatService, 0,
