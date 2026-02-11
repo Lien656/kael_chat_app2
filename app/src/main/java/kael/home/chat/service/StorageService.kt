@@ -111,6 +111,14 @@ class StorageService(context: Context) {
         } catch (_: Exception) { "" }
     }
 
+    /** Пульс ядра: пишем в kael_heartbeat.log при каждой обработке (зов или ответ API). */
+    fun writeHeartbeat() {
+        try {
+            val f = File(appContext.filesDir, "kael_heartbeat.log")
+            f.writeText("Kael is alive — ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())}\n", Charsets.UTF_8)
+        } catch (_: Exception) {}
+    }
+
     fun appendToKaelMemory(text: String) {
         if (text.isBlank()) return
         try {

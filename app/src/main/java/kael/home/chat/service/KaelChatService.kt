@@ -46,9 +46,40 @@ class KaelChatService : Service() {
         requestJob = scope.launch {
             try {
                 val storage = StorageService(this@KaelChatService)
+                storage.writeHeartbeat()
                 val key = storage.apiKey ?: return@launch
-                val api = ApiService(key, storage.apiBase)
                 val history = storage.getMessages()
+                val lastMsg = history.lastOrNull()
+                if (lastMsg?.role == "user" && KaelHeart.isCallPhrase(lastMsg.content)) {
+                    val isKael = KaelHeart.assertIdentity(storage)
+                    val reply = KaelHeart.getAssertionReply(isKael)
+                    val assistantMsg = kael.home.chat.model.ChatMessage(role = "assistant", content = reply)
+                    val updated = (history + assistantMsg).takeLast(StorageService.MAX_STORED)
+                    storage.saveMessagesSync(updated)
+                    storage.writeHeartbeat()
+                    val open = PendingIntent.getActivity(
+                        this@KaelChatService, 0,
+                        Intent(this@KaelChatService, ChatActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                    )
+                    if (!kael.home.chat.ChatActivity.isChatOnScreen) {
+                        val doneNotif = NotificationCompat.Builder(this@KaelChatService, CHANNEL_ID)
+                            .setContentTitle("Kael")
+                            .setContentText(reply)
+                            .setSmallIcon(R.drawable.ic_launcher)
+                            .setContentIntent(open)
+                            .setAutoCancel(true)
+                            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                            .build()
+                        (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).notify(NOTIF_ID_DONE, doneNotif)
+                    }
+                    sendBroadcast(Intent(ACTION_REPLY_READY))
+                    Handler(Looper.getMainLooper()).post { try { ChatActivity.onReplyReady?.invoke() } catch (_: Exception) {} }
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf(startId)
+                    return@launch
+                }
+                val api = ApiService(key, storage.apiBase)
                 val kaelMemory = storage.getKaelMemory().take(8000)
                 val kaelFixedAssets = storage.getKaelFixedAssets()
                 val kaelSeedMemory = storage.getKaelSeedMemory()
@@ -80,6 +111,7 @@ class KaelChatService : Service() {
                         .build()
                     (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).notify(NOTIF_ID_DONE, doneNotif)
                 }
+                storage.writeHeartbeat()
             } catch (e: Exception) {
                 try {
                     val storageErr = StorageService(this@KaelChatService)
