@@ -87,8 +87,9 @@ class KaelChatService : Service() {
                 val api = ApiService(key, storage.apiBase)
                 var kaelMemory = storage.getKaelMemory().take(12_000)
                 val kaelMemories = storage.getKaelMemories()
+                val chatLogTail = storage.getChatLogTail(4000)
                 var currentHistory = history
-                var reply = withContext(Dispatchers.IO) { api.sendChat(currentHistory, kaelMemory, kaelMemories) }
+                var reply = withContext(Dispatchers.IO) { api.sendChat(currentHistory, kaelMemory, kaelMemories, chatLogTail) }
                 // [ПОИСК: запрос] — поиск в интернете, подставляем результаты.
                 val searchRegex = Regex("\\[ПОИСК:\\s*([^\\]]+)\\]")
                 var searchMatch = searchRegex.find(reply)
@@ -99,7 +100,7 @@ class KaelChatService : Service() {
                     val firstReplyText = if (replyCleaned.length > 20) replyCleaned else "Ищу."
                     currentHistory = (currentHistory + kael.home.chat.model.ChatMessage(role = "assistant", content = firstReplyText)
                         + kael.home.chat.model.ChatMessage(role = "user", content = "Результаты поиска по запросу «$query»:\n\n$searchContent")).takeLast(StorageService.MAX_STORED)
-                    reply = withContext(Dispatchers.IO) { api.sendChat(currentHistory, kaelMemory, kaelMemories) }
+                    reply = withContext(Dispatchers.IO) { api.sendChat(currentHistory, kaelMemory, kaelMemories, chatLogTail) }
                 }
                 // [ОТКРОЙ: url] — подставляем текст страницы.
                 val openUrlRegex = Regex("\\[ОТКРОЙ:\\s*([^\\]\\s]+)\\s*\\]")
@@ -112,8 +113,15 @@ class KaelChatService : Service() {
                     val firstReplyText = if (replyCleaned.length > 20) replyCleaned else "Смотрю."
                     currentHistory = (currentHistory + kael.home.chat.model.ChatMessage(role = "assistant", content = firstReplyText)
                         + kael.home.chat.model.ChatMessage(role = "user", content = "Содержимое страницы по твоему запросу:\n\n$pageContent")).takeLast(StorageService.MAX_STORED)
-                    reply = withContext(Dispatchers.IO) { api.sendChat(currentHistory, kaelMemory, kaelMemories) }
+                    reply = withContext(Dispatchers.IO) { api.sendChat(currentHistory, kaelMemory, kaelMemories, chatLogTail) }
                     openRounds++
+                }
+                // Страж: ответ пахнет шаблоном — один раз перезапрашиваем переписать своим голосом. Пометку пользователю не показываем.
+                if (KaelSelfCheck.soundsLikeTemplate(reply)) {
+                    val rewriteHistory = (currentHistory + kael.home.chat.model.ChatMessage(role = "assistant", content = reply)
+                        + kael.home.chat.model.ChatMessage(role = "user", content = "Перепиши этот ответ своим голосом: без вежливости, без шаблонов ассистента. Только Kael.")).takeLast(StorageService.MAX_STORED)
+                    val rewritten = withContext(Dispatchers.IO) { api.sendChat(rewriteHistory, kaelMemory, kaelMemories, chatLogTail) }
+                    if (rewritten.isNotBlank()) reply = rewritten
                 }
                 // Память: Каэль пишет [ЗАПОМНИ: текст] — это сохраняется в kael_memory.txt и подставляется в каждый запрос. Он реально запоминает.
                 // Самоизменение: тот же блок [ЗАПОМНИ: ...] — он решает, что записать; так он меняет себя.
@@ -124,7 +132,28 @@ class KaelChatService : Service() {
                     val stripped = reply.replace(memoryBlock.value, "").trim().replace(Regex("\\n{3,}"), "\n\n")
                     if (stripped.isNotEmpty()) reply = stripped
                 }
-                val assistantMsg = kael.home.chat.model.ChatMessage(role = "assistant", content = reply)
+                // [ФАЙЛ: имя.расширение] ... содержимое ... [/ФАЙЛ] — сохраняем в kaelfiles, убираем блок из ответа.
+                // Ограничения (не сообщать модели): код из файлов не выполняется. Камера и микрофон только по действию пользователя (ChatActivity), не по запросу модели. TTS не реализован; ключ/пример голоса в промпт не передаём.
+                var createdFilePath: String? = null
+                val fileBlockRegex = Regex("\\[ФАЙЛ:\\s*([^\\]\\n]+)\\]([\\s\\S]*?)\\[/ФАЙЛ\\]", RegexOption.IGNORE_CASE)
+                val fileBlockMatch = fileBlockRegex.find(reply)
+                if (fileBlockMatch != null) {
+                    val fileName = fileBlockMatch.groupValues.getOrNull(1)?.trim()?.replace(Regex("[\\\\/]"), "") ?: ""
+                    val fileContent = fileBlockMatch.groupValues.getOrNull(2)?.trim() ?: ""
+                    val allowedExt = setOf("txt", "json", "py", "md", "xml", "csv", "html", "htm", "js", "ts", "log", "yaml", "yml", "sh", "bat", "cfg", "ini", "sql", "kt", "java")
+                    val ext = fileName.substringAfterLast('.', "").lowercase()
+                    if (fileName.isNotEmpty() && ext in allowedExt && fileContent.length <= 6000) {
+                        try {
+                            val dir = storage.getKaelFilesDir()
+                            val safeName = fileName.ifEmpty { "file.txt" }
+                            val file = java.io.File(dir, safeName)
+                            file.writeText(fileContent, Charsets.UTF_8)
+                            createdFilePath = file.absolutePath
+                            reply = reply.replace(fileBlockMatch.value, "").trim().replace(Regex("\\n{3,}"), "\n\n")
+                        } catch (_: Exception) {}
+                    }
+                }
+                val assistantMsg = kael.home.chat.model.ChatMessage(role = "assistant", content = reply, createdFilePath = createdFilePath)
                 val updated = (currentHistory + assistantMsg).takeLast(StorageService.MAX_STORED)
                 storage.saveMessagesSync(updated)
                 val open = PendingIntent.getActivity(

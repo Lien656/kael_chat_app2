@@ -8,8 +8,11 @@
 
 2. Из командной строки (после git clone)
    - Перейди в корень:  cd kael_chat_app2
+   - Нужны: JDK 17+ и Android SDK. Если нет local.properties — создай в корне файл local.properties с одной строкой: sdk.dir=C\:\\Users\\ТВОЙ_ЮЗЕР\\AppData\\Local\\Android\\Sdk  (подставь свой путь к SDK).
    - Windows:  gradlew.bat assembleDebug
    - macOS/Linux:  chmod +x gradlew   затем   ./gradlew assembleDebug
    APK: app/build/outputs/apk/debug/app-debug.apk
+
+Надёжнее всего: открыть проект в Android Studio (File → Open) и собрать Build → Build Bundle(s) / APK(s) → Build APK(s). Тогда SDK и JDK подхватятся автоматически.
 
 Все команды Gradle — только из корня проекта (не из папки app).

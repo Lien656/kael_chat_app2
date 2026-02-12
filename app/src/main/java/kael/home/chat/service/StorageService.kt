@@ -132,6 +132,23 @@ class StorageService(context: Context) {
         } catch (_: Exception) {}
     }
 
+    /** Хвост лога чата — модель может опереться на контекст. */
+    fun getChatLogTail(maxChars: Int = 4000): String {
+        return try {
+            val file = File(appContext.filesDir, "chat_log.txt")
+            if (!file.exists()) return ""
+            val full = file.readText(Charsets.UTF_8)
+            if (full.length <= maxChars) full.trim() else full.takeLast(maxChars).trim().let { "…\n$it" }
+        } catch (_: Exception) { "" }
+    }
+
+    /** Папка kaelfiles для файлов, которые создаёт Kael. Создаётся при первом обращении. */
+    fun getKaelFilesDir(): File {
+        val dir = File(appContext.filesDir, "kaelfiles")
+        if (!dir.exists()) dir.mkdirs()
+        return dir
+    }
+
     /** Экспорт чата в текстовый файл. Возвращает файл в filesDir/exports/ для передачи в Share или сохранения. */
     fun exportChatToFile(): File? {
         return try {

@@ -149,6 +149,25 @@ class ChatActivity : AppCompatActivity() {
                 } catch (_: Exception) {
                     Toast.makeText(this, R.string.error_save, Toast.LENGTH_SHORT).show()
                 }
+            },
+            onOpenCreatedFile = { filePath ->
+                try {
+                    val file = java.io.File(filePath)
+                    if (file.exists()) {
+                        val uri = androidx.core.content.FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
+                        val mime = when (filePath.substringAfterLast('.').lowercase()) {
+                            "json" -> "application/json"
+                            "html", "htm" -> "text/html"
+                            "xml" -> "application/xml"
+                            "md" -> "text/markdown"
+                            else -> "text/*"
+                        }
+                        startActivity(Intent(Intent.ACTION_VIEW).apply {
+                            setDataAndType(uri, mime)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        })
+                    }
+                } catch (_: Exception) {}
             }
         )
         recycler.layoutManager = LinearLayoutManager(this).apply { stackFromEnd = true }
@@ -341,6 +360,7 @@ class ChatActivity : AppCompatActivity() {
         }
     }
 
+    /** Камера и микрофон запускаются только отсюда (пользователь). Модель/API не могут их включать. */
     private fun showAttachOptions() {
         AlertDialog.Builder(this)
             .setTitle(getString(R.string.attach_choose))

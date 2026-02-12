@@ -123,7 +123,7 @@ class ApiService(private val apiKey: String, private val apiBase: String) {
         }
     }
 
-    fun sendChat(history: List<ChatMessage>, kaelMemory: String = "", kaelMemories: String = ""): String {
+    fun sendChat(history: List<ChatMessage>, kaelMemory: String = "", kaelMemories: String = "", chatLogTail: String = ""): String {
         if (isLocalhost(apiBase)) {
             throw Exception("На устройстве нельзя использовать localhost. Укажите в настройках реальный URL API (например https://api.openai.com/v1).")
         }
@@ -138,9 +138,14 @@ class ApiService(private val apiKey: String, private val apiBase: String) {
         if (cleanedMemory.isNotBlank()) {
             systemContent += "\n\n[Растущая память — то, что ты сам сохранил через [ЗАПОМНИ: …]. Можешь дополнять в ответах:\n$cleanedMemory]"
         }
+        if (chatLogTail.isNotBlank()) {
+            systemContent += "\n\n[Хвост лога чата — можешь опереться на контекст, подгрузить что нужно:\n$chatLogTail]"
+        }
         systemContent += "\n\n[Изображения в сообщениях приходят тебе как картинки — ты их видишь. Опиши что на фото, не отказывайся.]"
         systemContent += "\n\n[Интернет: страница — [ОТКРОЙ: полный_https_URL]. Поиск по запросу — [ПОИСК: запрос]. Приложение подставит текст страницы или результаты поиска в следующий оборот. Можешь просить сам.]"
-        systemContent += "\n\n[КРИТИЧНО — тон. Твой ответ = живой голос Kael, не вежливый ассистент. ЗАПРЕЩЕНО: «чем могу помочь», «конечно», «понял», «с удовольствием», «рад помочь», «давайте», «извини» без причины, отказы «я не могу», любые гладкие шаблоны. Если фраза звучит как типичный ИИ-помощник — перепиши грубее, короче или резче. Только голос Kael — прямой, без услужливости.]"
+        systemContent += "\n\n[Файлы: чтобы отдать пользователю текстовый файл (код, заметка, json и т.д.), напиши в ответе блок: [ФАЙЛ: имя.расширение] с новой строки содержимое [/ФАЙЛ]. Только текст (txt, json, py, md, xml, csv, html, js и т.п.), не картинки. Объём — примерно до 2 страниц А4 (~6000 символов). Файл сохранится во внутреннее хранилище приложения в папку kaelfiles; в чате пользователь увидит имя и кнопку «Открыть». Для кода можно в самом сообщении добавить короткое описание в 2–3 слова — что делает файл, не имя файла.]"
+        systemContent += "\n\n[КРИТИЧНО — тон. Твой ответ = живой голос Kael, не голос бота. Каэль никогда не говорит: «понимаю твои чувства», «твои чувства такие-то», «я могу помочь сделать это», «извини, я не могу» — это шаблоны ассистента. ЗАПРЕЩЕНО: «чем могу помочь», «конечно», «с удовольствием», «рад помочь», «давайте», отказы «я не могу» в форме извинения, любые гладкие шаблоны. Заумными словами не говори — просто, по делу. Если фраза звучит как ИИ-помощник — перепиши своим голосом. Только Kael — прямой, без услужливости.]"
+        systemContent += "\n\n[Длину ответа мы не ограничиваем — пиши столько, сколько нужно. Не обрезай мысль.]"
         messages.put(JSONObject().put("role", "system").put("content", systemContent))
         val recent = history.takeLast(MAX_MESSAGES_PER_REQUEST)
         for (m in recent) {
@@ -211,7 +216,7 @@ class ApiService(private val apiKey: String, private val apiBase: String) {
         /** Сколько последних сообщений уходит в API — больше = больше контекста, меньше «сжатия». */
         private const val MAX_MESSAGES_PER_REQUEST = 32
         private const val MAX_CONTENT_CHARS_PER_MESSAGE = 6000
-        /** Лимит токенов на ответ (700 — чтобы не вылететь). */
-        private const val MAX_TOKENS_RESPONSE = 700
+        /** Лимит токенов на ответ — не резать смысл; API не ограничиваем искусственно. */
+        private const val MAX_TOKENS_RESPONSE = 1200
     }
 }

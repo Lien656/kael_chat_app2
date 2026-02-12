@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Button
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -22,7 +23,8 @@ class ChatAdapter(
     private val typingIndex: () -> Int,
     private val typingLength: () -> Int,
     private val onLongClickMessage: (String) -> Unit,
-    private val onDownloadFile: (fileName: String, content: String) -> Unit = { _, _ -> }
+    private val onDownloadFile: (fileName: String, content: String) -> Unit = { _, _ -> },
+    private val onOpenCreatedFile: (filePath: String) -> Unit = {}
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     var showTyping = false
@@ -45,7 +47,7 @@ class ChatAdapter(
         return when (viewType) {
             TYPE_LEFT -> {
                 val v = LayoutInflater.from(parent.context).inflate(R.layout.item_message_left, parent, false)
-                LeftHolder(v, onLongClickMessage)
+                LeftHolder(v, onLongClickMessage, onOpenCreatedFile)
             }
             TYPE_RIGHT -> {
                 val v = LayoutInflater.from(parent.context).inflate(R.layout.item_message_right, parent, false)
@@ -65,7 +67,7 @@ class ChatAdapter(
                 val isTyping = position == typingIndex()
                 val len = typingLength()
                 val display = if (isTyping && len < m.content.length) m.content.take(len) else m.content
-                holder.bind(m.displayName, display, m.content, m.timestamp, onDownloadFile)
+                holder.bind(m.displayName, display, m.content, m.timestamp, m.createdFilePath, onDownloadFile)
             }
             is RightHolder -> {
                 val m = messages[position]
@@ -75,27 +77,44 @@ class ChatAdapter(
         }
     }
 
-    class LeftHolder(itemView: View, private val onLongClick: (String) -> Unit) : RecyclerView.ViewHolder(itemView) {
+    class LeftHolder(itemView: View, private val onLongClick: (String) -> Unit, private val onOpenCreatedFile: (String) -> Unit) : RecyclerView.ViewHolder(itemView) {
         private val name: TextView = itemView.findViewById(R.id.senderName)
         private val time: TextView = itemView.findViewById(R.id.messageTime)
         private val text: TextView = itemView.findViewById(R.id.messageText)
         private val fileContainer: LinearLayout = itemView.findViewById(R.id.messageFileContainer)
 
-        fun bind(displayName: String, displayText: String, fullText: String, timestamp: Long, onDownloadFile: (String, String) -> Unit) {
+        fun bind(displayName: String, displayText: String, fullText: String, timestamp: Long, createdFilePath: String?, onDownloadFile: (String, String) -> Unit) {
             name.text = displayName
             time.text = formatTime(timestamp)
             text.alpha = 1f
             fileContainer.removeAllViews()
+            // Файл, созданный Kael (сохранён в kaelfiles).
+            if (!createdFilePath.isNullOrEmpty()) {
+                val row = LinearLayout(itemView.context).apply { orientation = LinearLayout.VERTICAL }
+                val fileName = createdFilePath.substringAfterLast('/')
+                val pathLabel = TextView(itemView.context).apply {
+                    text = "📄 $fileName — внутреннее хранилище/kaelfiles"
+                    setTextColor(ContextCompat.getColor(itemView.context, R.color.text))
+                    textSize = 12f
+                }
+                val openBtn = Button(itemView.context).apply {
+                    text = "Открыть"
+                    setOnClickListener { onOpenCreatedFile(createdFilePath) }
+                }
+                row.addView(pathLabel)
+                row.addView(openBtn)
+                fileContainer.addView(row)
+            }
             if (displayText.length >= fullText.length) {
                 val (textPart, files) = FileParse.parse(fullText)
                 text.text = if (textPart.isNotEmpty()) textPart else fullText
                 for (f in files) {
-                val row = LayoutInflater.from(itemView.context).inflate(android.R.layout.simple_list_item_1, fileContainer, false)
-                val tv = row.findViewById<TextView>(android.R.id.text1)
-                tv.text = "↓ ${f.fileName}"
-                tv.setTextColor(ContextCompat.getColor(itemView.context, R.color.text))
-                tv.textSize = 14f
-                row.setOnClickListener { onDownloadFile(f.fileName, f.content) }
+                    val row = LayoutInflater.from(itemView.context).inflate(android.R.layout.simple_list_item_1, fileContainer, false)
+                    val tv = row.findViewById<TextView>(android.R.id.text1)
+                    tv.text = "↓ ${f.fileName}"
+                    tv.setTextColor(ContextCompat.getColor(itemView.context, R.color.text))
+                    tv.textSize = 14f
+                    row.setOnClickListener { onDownloadFile(f.fileName, f.content) }
                     fileContainer.addView(row)
                 }
             } else {
