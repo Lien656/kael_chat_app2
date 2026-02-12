@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
+    <application
+        android:name="kael.home.chat.KaelChatApp"
+        android:allowBackup="true"
+        android:icon="@drawable/ic_launcher_app"
+        android:label="@string/app_name"
+        android:roundIcon="@drawable/ic_launcher_app"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.KaelChat"
+        android:usesCleartextTraffic="true"
+        tools:targetApi="34">
+
+        <activity
+            android:name="kael.home.chat.MainActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.KaelChat">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name="kael.home.chat.ChatActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.KaelChat" />
+
+        <activity
+            android:name="kael.home.chat.SettingsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.KaelChat" />
+
+        <activity
+            android:name="kael.home.chat.ApiKeyActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.KaelChat" />
+
+        <activity
+            android:name="kael.home.chat.ApiUrlActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.KaelChat" />
+
+        <activity
+            android:name="kael.home.chat.ConsoleActivity"
+            android:exported="false"
+            android:theme="@style/Theme.KaelChat" />
+
+        <activity
+            android:name="kael.home.chat.AttachmentsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.KaelChat" />
+
+        <service
+            android:name="kael.home.chat.service.KaelChatService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+    </application>
+</manifest>
