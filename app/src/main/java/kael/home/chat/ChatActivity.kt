@@ -362,7 +362,7 @@ class ChatActivity : AppCompatActivity() {
 
     /** Камера и микрофон запускаются только отсюда (пользователь). Модель/API не могут их включать. */
     private fun showAttachOptions() {
-        AlertDialog.Builder(this)
+        val dialog = AlertDialog.Builder(this, R.style.DialogThemeKael)
             .setTitle(getString(R.string.attach_choose))
             .setItems(arrayOf(getString(R.string.attach_camera), getString(R.string.attach_files))) { _, which ->
                 when (which) {
@@ -370,7 +370,14 @@ class ChatActivity : AppCompatActivity() {
                     1 -> pickFileLauncher.launch("*/*")
                 }
             }
-            .show()
+            .create()
+        dialog.show()
+        // Матовое стекло: полупрозрачный фон в цвете Каэля + размытие на Android 12+
+        dialog.window?.let { window ->
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                window.setBackgroundBlurRadius(50)
+            }
+        }
     }
 
     private fun takePicture() {

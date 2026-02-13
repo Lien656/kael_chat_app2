@@ -2,6 +2,7 @@ package kael.home.chat
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.LayoutInflater
 import android.widget.ArrayAdapter
 import android.widget.ListView
 import android.widget.Toast
@@ -21,6 +22,16 @@ class SettingsActivity : AppCompatActivity() {
         toolbar.setNavigationOnClickListener { finish() }
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         val list = findViewById<ListView>(R.id.list)
+        // Заголовок с переключателем «Вибрация при ответе»
+        val headerView = LayoutInflater.from(this).inflate(R.layout.item_settings_switch, list, false)
+        val titleView = headerView.findViewById<android.widget.TextView>(R.id.title)
+        titleView.text = getString(R.string.vibration_on_reply)
+        val switchVibration = headerView.findViewById<androidx.appcompat.widget.SwitchCompat>(R.id.switchVibration)
+        switchVibration.isChecked = storage.vibrationOnReply
+        switchVibration.setOnCheckedChangeListener { _, isChecked ->
+            storage.vibrationOnReply = isChecked
+        }
+        list.addHeaderView(headerView, null, false)
         val items = listOf(
             getString(R.string.change_api_key),
             getString(R.string.export_chat),
@@ -30,7 +41,9 @@ class SettingsActivity : AppCompatActivity() {
         )
         list.adapter = ArrayAdapter(this, R.layout.item_settings, items)
         list.setOnItemClickListener { _, _, position, _ ->
-            when (position) {
+            val index = position - 1
+            if (index < 0) return@setOnItemClickListener
+            when (index) {
                 0 -> startActivity(Intent(this, ApiKeyActivity::class.java).apply {
                     putExtra(ApiKeyActivity.EXTRA_FROM_SETTINGS, true)
                 })

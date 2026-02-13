@@ -3,8 +3,10 @@
     <color name="background">#111111</color>
     <color name="text">#FFB4B4B4</color>
     <color name="kael_name">#FF3F0000</color>
+    <!-- Полупрозрачное «матовое стекло» для диалогов — цвет Каэля -->
+    <color name="kael_dialog_glass">#993F0000</color>
     <color name="lien_name">#FF5A003E</color>
-    <!-- #2d2d2d с 16% прозрачностью (84% opacity = 0xD6) -->
-    <color name="bubble">#D62D2D2D</color>
+    <!-- Облачка и панель ввода: прозрачность 17% (alpha 0x2B) -->
+    <color name="bubble">#2B2D2D2D</color>
     <color name="hint">#FF6B6B6B</color>
 </resources>

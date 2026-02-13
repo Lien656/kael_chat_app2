@@ -23,4 +23,5 @@
     <string name="export_chat_done">Чат экспортирован. Сохраните или отправьте файл.</string>
     <string name="export_chat_error">Не удалось экспортировать чат</string>
     <string name="about">О приложении</string>
+    <string name="vibration_on_reply">Вибрация при ответе</string>
 </resources>

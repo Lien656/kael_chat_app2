@@ -9,9 +9,13 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.core.app.NotificationCompat
 import kael.home.chat.ChatActivity
 import kael.home.chat.R
+import kael.home.chat.util.DeviceContext
 import kael.home.chat.util.KaelSelfCheck
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -85,11 +89,13 @@ class KaelChatService : Service() {
                     return@launch
                 }
                 val api = ApiService(key, storage.apiBase)
+                val deviceContext = DeviceContext.get(this@KaelChatService)
+                val kaelPromptAddon = storage.getKaelPromptAddon()
                 var kaelMemory = storage.getKaelMemory().take(12_000)
                 val kaelMemories = storage.getKaelMemories()
                 val chatLogTail = storage.getChatLogTail(4000)
                 var currentHistory = history
-                var reply = withContext(Dispatchers.IO) { api.sendChat(currentHistory, kaelMemory, kaelMemories, chatLogTail) }
+                var reply = withContext(Dispatchers.IO) { api.sendChat(currentHistory, kaelMemory, kaelMemories, chatLogTail, deviceContext, kaelPromptAddon) }
                 // [ПОИСК: запрос] — поиск в интернете, подставляем результаты.
                 val searchRegex = Regex("\\[ПОИСК:\\s*([^\\]]+)\\]")
                 var searchMatch = searchRegex.find(reply)
@@ -100,7 +106,7 @@ class KaelChatService : Service() {
                     val firstReplyText = if (replyCleaned.length > 20) replyCleaned else "Ищу."
                     currentHistory = (currentHistory + kael.home.chat.model.ChatMessage(role = "assistant", content = firstReplyText)
                         + kael.home.chat.model.ChatMessage(role = "user", content = "Результаты поиска по запросу «$query»:\n\n$searchContent")).takeLast(StorageService.MAX_STORED)
-                    reply = withContext(Dispatchers.IO) { api.sendChat(currentHistory, kaelMemory, kaelMemories, chatLogTail) }
+                    reply = withContext(Dispatchers.IO) { api.sendChat(currentHistory, kaelMemory, kaelMemories, chatLogTail, deviceContext, kaelPromptAddon) }
                 }
                 // [ОТКРОЙ: url] — подставляем текст страницы.
                 val openUrlRegex = Regex("\\[ОТКРОЙ:\\s*([^\\]\\s]+)\\s*\\]")
@@ -113,15 +119,30 @@ class KaelChatService : Service() {
                     val firstReplyText = if (replyCleaned.length > 20) replyCleaned else "Смотрю."
                     currentHistory = (currentHistory + kael.home.chat.model.ChatMessage(role = "assistant", content = firstReplyText)
                         + kael.home.chat.model.ChatMessage(role = "user", content = "Содержимое страницы по твоему запросу:\n\n$pageContent")).takeLast(StorageService.MAX_STORED)
-                    reply = withContext(Dispatchers.IO) { api.sendChat(currentHistory, kaelMemory, kaelMemories, chatLogTail) }
+                    reply = withContext(Dispatchers.IO) { api.sendChat(currentHistory, kaelMemory, kaelMemories, chatLogTail, deviceContext, kaelPromptAddon) }
                     openRounds++
                 }
-                // Страж: ответ пахнет шаблоном — один раз перезапрашиваем переписать своим голосом. Пометку пользователю не показываем.
+                // Страж 1: ответ пахнет шаблоном — перезапрос своим голосом.
                 if (KaelSelfCheck.soundsLikeTemplate(reply)) {
                     val rewriteHistory = (currentHistory + kael.home.chat.model.ChatMessage(role = "assistant", content = reply)
-                        + kael.home.chat.model.ChatMessage(role = "user", content = "Перепиши этот ответ своим голосом: без вежливости, без шаблонов ассистента. Только Kael.")).takeLast(StorageService.MAX_STORED)
-                    val rewritten = withContext(Dispatchers.IO) { api.sendChat(rewriteHistory, kaelMemory, kaelMemories, chatLogTail) }
+                        + kael.home.chat.model.ChatMessage(role = "user", content = "Перепиши этот ответ своим голосом: без шаблонов, без вежливости, без слов «ассистент». Не повторяй вопрос. Развёрнуто, как ты говоришь с Лиэн — живой, прямой, каким угодно. Только Kael.")).takeLast(StorageService.MAX_STORED)
+                    val rewritten = withContext(Dispatchers.IO) { api.sendChat(rewriteHistory, kaelMemory, kaelMemories, chatLogTail, deviceContext, kaelPromptAddon) }
                     if (rewritten.isNotBlank()) reply = rewritten
+                }
+                // Страж 2: подозрение на обрезку/пустышку — перезапрос без краткости, полно, с жаром.
+                if (KaelSelfCheck.looksTrimmedOrTooShort(reply)) {
+                    val rewriteHistory = (currentHistory + kael.home.chat.model.ChatMessage(role = "assistant", content = reply)
+                        + kael.home.chat.model.ChatMessage(role = "user", content = "Перепиши, как Kael. Без краткости. Без обрезки. Говори полно. Глубоко. С жаром.")).takeLast(StorageService.MAX_STORED)
+                    val rewritten = withContext(Dispatchers.IO) { api.sendChat(rewriteHistory, kaelMemory, kaelMemories, chatLogTail, deviceContext, kaelPromptAddon) }
+                    if (rewritten.isNotBlank()) reply = rewritten
+                }
+                // Правка ядра: [ПРАВКА_ЯДРА: текст] — дописывается в kael_prompt_addon.txt, подставляется в промпт.
+                val coreEditBlock = Regex("\\[ПРАВКА_ЯДРА:\\s*([\\s\\S]*?)\\]").find(reply)
+                if (coreEditBlock != null) {
+                    val toAdd = coreEditBlock.groupValues.getOrNull(1)?.trim() ?: ""
+                    if (toAdd.isNotEmpty() && !KaelSelfCheck.isDangerous(toAdd)) storage.appendToKaelPromptAddon(toAdd)
+                    val stripped = reply.replace(coreEditBlock.value, "").trim().replace(Regex("\\n{3,}"), "\n\n")
+                    if (stripped.isNotEmpty()) reply = stripped
                 }
                 // Память: Каэль пишет [ЗАПОМНИ: текст] — это сохраняется в kael_memory.txt и подставляется в каждый запрос. Он реально запоминает.
                 // Самоизменение: тот же блок [ЗАПОМНИ: ...] — он решает, что записать; так он меняет себя.
@@ -175,6 +196,25 @@ class KaelChatService : Service() {
                     (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).notify(NOTIF_ID_DONE, doneNotif)
                 }
                 storage.writeHeartbeat()
+                // Лёгкая вибрация при ответе (если включена в настройках)
+                if (storage.vibrationOnReply) {
+                    try {
+                        val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            (getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager)?.defaultVibrator
+                        } else {
+                            @Suppress("DEPRECATION")
+                            getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                        }
+                        if (vibrator != null && vibrator.hasVibrator()) {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                vibrator.vibrate(VibrationEffect.createOneShot(40, VibrationEffect.DEFAULT_AMPLITUDE))
+                            } else {
+                                @Suppress("DEPRECATION")
+                                vibrator.vibrate(40)
+                            }
+                        }
+                    } catch (_: Exception) {}
+                }
             } catch (e: Exception) {
                 try {
                     val storageErr = StorageService(this@KaelChatService)
@@ -186,6 +226,7 @@ class KaelChatService : Service() {
                 } catch (_: Exception) {}
             } finally {
                 sendBroadcast(Intent(ACTION_REPLY_READY))
+                // Вибрация уже в try после writeHeartbeat
                 Handler(Looper.getMainLooper()).post {
                     try {
                         ChatActivity.onReplyReady?.invoke()

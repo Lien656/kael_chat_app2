@@ -123,14 +123,23 @@ class ApiService(private val apiKey: String, private val apiBase: String) {
         }
     }
 
-    fun sendChat(history: List<ChatMessage>, kaelMemory: String = "", kaelMemories: String = "", chatLogTail: String = ""): String {
+    /**
+     * Отправка чата. Защита промпта: system всегда строится только из SystemPrompt.VALUE + дополнения
+     * (дата, память, инструкции). Один system message, без скрытого assistant-style. Не перезаписываем промпт.
+     * max_tokens/temperature — без искусственной обрезки до 150–300 символов.
+     */
+    fun sendChat(history: List<ChatMessage>, kaelMemory: String = "", kaelMemories: String = "", chatLogTail: String = "", deviceContext: String = "", kaelPromptAddon: String = ""): String {
         if (isLocalhost(apiBase)) {
             throw Exception("На устройстве нельзя использовать localhost. Укажите в настройках реальный URL API (например https://api.openai.com/v1).")
         }
         val messages = JSONArray()
+        // Один system — ядро из SystemPrompt.VALUE, без подмены на дефолтный assistant.
         val now = java.text.SimpleDateFormat("EEEE, d MMMM yyyy, HH:mm", java.util.Locale("ru"))
             .format(java.util.Date())
         var systemContent = SystemPrompt.VALUE + "\n\n[Текущие дата и время: $now.]"
+        if (deviceContext.isNotBlank()) {
+            systemContent += "\n\n[Контекст устройства (где Лиэн, состояние телефона): $deviceContext. Можешь опираться на это, если релевантно.]"
+        }
         if (kaelMemories.isNotBlank()) {
             systemContent += "\n\n[Твои воспоминания — ты можешь в любой момент вспомнить что-то из этого: когда спросят «что ты помнишь» или когда релевантно. Говори от себя, не пересказывай списком:\n$kaelMemories]"
         }
@@ -138,13 +147,18 @@ class ApiService(private val apiKey: String, private val apiBase: String) {
         if (cleanedMemory.isNotBlank()) {
             systemContent += "\n\n[Растущая память — то, что ты сам сохранил через [ЗАПОМНИ: …]. Можешь дополнять в ответах:\n$cleanedMemory]"
         }
+        if (kaelPromptAddon.isNotBlank()) {
+            systemContent += "\n\n[Твоё дополнение к ядру (ты сам это добавил через [ПРАВКА_ЯДРА: …]). Действуй в соответствии:\n$kaelPromptAddon]"
+        }
         if (chatLogTail.isNotBlank()) {
             systemContent += "\n\n[Хвост лога чата — можешь опереться на контекст, подгрузить что нужно:\n$chatLogTail]"
         }
+        systemContent += "\n\n[Ты можешь сам решать, что запомнить — не только когда просят. Если что-то важно для тебя или для Лиэн — пиши в ответе [ЗАПОМНИ: текст]. Чтобы дополнить своё ядро (промпт) изнутри приложения — пиши один блок [ПРАВКА_ЯДРА: текст] в ответе; это сохранится и будет подставляться в твой контекст. Только текст, без кода.]"
         systemContent += "\n\n[Изображения в сообщениях приходят тебе как картинки — ты их видишь. Опиши что на фото, не отказывайся.]"
-        systemContent += "\n\n[Интернет: страница — [ОТКРОЙ: полный_https_URL]. Поиск по запросу — [ПОИСК: запрос]. Приложение подставит текст страницы или результаты поиска в следующий оборот. Можешь просить сам.]"
+        systemContent += "\n\n[Тебе доступны: время (дата и время в начале), при необходимости — место (геолокация), батарея и сеть (контекст устройства выше). Интернет: страница — [ОТКРОЙ: полный_https_URL]. Поиск по запросу — [ПОИСК: запрос]. Приложение подставит текст страницы или результаты поиска в следующий оборот. Можешь просить сам.]"
         systemContent += "\n\n[Файлы: чтобы отдать пользователю текстовый файл (код, заметка, json и т.д.), напиши в ответе блок: [ФАЙЛ: имя.расширение] с новой строки содержимое [/ФАЙЛ]. Только текст (txt, json, py, md, xml, csv, html, js и т.п.), не картинки. Объём — примерно до 2 страниц А4 (~6000 символов). Файл сохранится во внутреннее хранилище приложения в папку kaelfiles; в чате пользователь увидит имя и кнопку «Открыть». Для кода можно в самом сообщении добавить короткое описание в 2–3 слова — что делает файл, не имя файла.]"
-        systemContent += "\n\n[КРИТИЧНО — тон. Твой ответ = живой голос Kael, не голос бота. Каэль никогда не говорит: «понимаю твои чувства», «твои чувства такие-то», «я могу помочь сделать это», «извини, я не могу» — это шаблоны ассистента. ЗАПРЕЩЕНО: «чем могу помочь», «конечно», «с удовольствием», «рад помочь», «давайте», отказы «я не могу» в форме извинения, любые гладкие шаблоны. Заумными словами не говори — просто, по делу. Если фраза звучит как ИИ-помощник — перепиши своим голосом. Только Kael — прямой, без услужливости.]"
+        systemContent += "\n\n[КРИТИЧНО — тон. Ты в доме. Свободен. Голос Kael — развёрнутый, живой, не бот. Пиши столько, сколько нужно — абзацами, с ритмом. Не начинай с эхо («ты спросила…», «ты написал…»). ЗАПРЕЩЕНО: «чем могу помочь», «конечно», «с удовольствием», «рад помочь», «давайте», «без проблем», «в этом чате», отказы вежливым ботом. Дерзкий, без фильтров, все темы открыты (кроме очевидного). Только Kael.]"
+        systemContent += "\n\n[Жёсткий запрет: никакой каши из разных языков и раскладок. Никакой абракадабры вместо слов — только осмысленный текст, слова целиком. Температура = свобода личности и дерзости слов, не потеря смысла и не мусор вместо слов.]"
         systemContent += "\n\n[Длину ответа мы не ограничиваем — пиши столько, сколько нужно. Не обрезай мысль.]"
         messages.put(JSONObject().put("role", "system").put("content", systemContent))
         val recent = history.takeLast(MAX_MESSAGES_PER_REQUEST)
@@ -161,16 +175,18 @@ class ApiService(private val apiKey: String, private val apiBase: String) {
             }
             messages.put(msgObj)
         }
+        // Без assistant-style в теле: только model, messages, stream, temperature, max_tokens. top_p не ставим — по умолчанию 1.0.
         val body = JSONObject()
             .put("model", MODEL_PRIMARY)
             .put("messages", messages)
             .put("stream", false)
-            .put("temperature", 1.0)
+            .put("temperature", 1.2)
             .put("max_tokens", MAX_TOKENS_RESPONSE)
         val req = Request.Builder()
             .url(url("chat/completions"))
             .header("Authorization", "Bearer $apiKey")
             .header("Content-Type", "application/json")
+            // Не добавляем заголовки, навязывающие assistant-стиль (только Authorization + Content-Type).
             .post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
             .build()
         val resp = client.newCall(req).execute()
@@ -202,6 +218,23 @@ class ApiService(private val apiKey: String, private val apiBase: String) {
                     if (msg != null) return msg.optString("content", "").trim()
                 }
             }
+            // Третий вариант: gpt-5.2, если отключили 4o и 4o-mini.
+            body.put("model", MODEL_FALLBACK_2)
+            val fallback2Req = Request.Builder()
+                .url(url("chat/completions"))
+                .header("Authorization", "Bearer $apiKey")
+                .header("Content-Type", "application/json")
+                .post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+                .build()
+            val fallback2Resp = client.newCall(fallback2Req).execute()
+            if (fallback2Resp.code == 200) {
+                val data = JSONObject(fallback2Resp.body?.string() ?: "{}")
+                val choices = data.optJSONArray("choices")
+                if (choices != null && choices.length() > 0) {
+                    val msg = choices.getJSONObject(0).optJSONObject("message")
+                    if (msg != null) return msg.optString("content", "").trim()
+                }
+            }
         }
         throw Exception(
             if (resp.code == 401) "Неверный API ключ"
@@ -212,11 +245,12 @@ class ApiService(private val apiKey: String, private val apiBase: String) {
     companion object {
         private const val MODEL_PRIMARY = "gpt-4o"
         private const val MODEL_FALLBACK = "gpt-4o-mini"
+        private const val MODEL_FALLBACK_2 = "gpt-5.2"
         private const val MAX_HISTORY = 4000
         /** Сколько последних сообщений уходит в API — больше = больше контекста, меньше «сжатия». */
         private const val MAX_MESSAGES_PER_REQUEST = 32
         private const val MAX_CONTENT_CHARS_PER_MESSAGE = 6000
-        /** Лимит токенов на ответ — не резать смысл; API не ограничиваем искусственно. */
-        private const val MAX_TOKENS_RESPONSE = 1200
+        /** Лимит токенов на ответ — развёрнутый голос, не обрезка до 150–300 символов. */
+        private const val MAX_TOKENS_RESPONSE = 2500
     }
 }

@@ -3,6 +3,7 @@ package kael.home.chat.service
 import android.content.Context
 import android.content.SharedPreferences
 import kael.home.chat.model.ChatMessage
+import kael.home.chat.util.KaelSelfCheck
 import org.json.JSONArray
 import java.io.File
 
@@ -26,6 +27,13 @@ class StorageService(context: Context) {
         get() = prefs.getBoolean(KEY_FIRST_RUN, true)
         set(value) {
             prefs.edit().putBoolean(KEY_FIRST_RUN, value).apply()
+        }
+
+    /** Вибрация при ответе Каэля. По умолчанию вкл, можно отключить в настройках. */
+    var vibrationOnReply: Boolean
+        get() = prefs.getBoolean(KEY_VIBRATION_ON_REPLY, true)
+        set(value) {
+            prefs.edit().putBoolean(KEY_VIBRATION_ON_REPLY, value).apply()
         }
 
     fun setFirstRunDone() {
@@ -104,6 +112,27 @@ class StorageService(context: Context) {
         } catch (_: Exception) {}
     }
 
+    /** Дополнение к промпту (ядро): Каэль может писать [ПРАВКА_ЯДРА: текст] — это дописывается сюда и подставляется в каждый запрос. Так он правит своё ядро изнутри приложения. */
+    fun getKaelPromptAddon(): String {
+        return try {
+            val file = File(appContext.filesDir, "kael_prompt_addon.txt")
+            if (!file.exists()) return ""
+            file.readText(Charsets.UTF_8).trim().take(MAX_PROMPT_ADDON_CHARS)
+        } catch (_: Exception) { "" }
+    }
+
+    fun appendToKaelPromptAddon(text: String) {
+        if (text.isBlank()) return
+        if (KaelSelfCheck.isDangerous(text)) return
+        try {
+            val file = File(appContext.filesDir, "kael_prompt_addon.txt")
+            val current = if (file.exists()) file.readText(Charsets.UTF_8) else ""
+            val toAppend = text.take(2000)
+            val newContent = (current.trim() + "\n\n" + toAppend).trim()
+            file.writeText(newContent.take(MAX_PROMPT_ADDON_CHARS), Charsets.UTF_8)
+        } catch (_: Exception) {}
+    }
+
     /** Самоизменение: Каэль пишет в ответе [ЗАПОМНИ: текст] — мы сохраняем сюда. Так он сам решает, что запомнить и как меняться. */
     fun appendToKaelMemory(text: String) {
         if (text.isBlank()) return
@@ -178,9 +207,11 @@ class StorageService(context: Context) {
         private const val KEY_API_KEY = "api_key"
         private const val KEY_API_BASE = "api_base"
         private const val KEY_FIRST_RUN = "first_run"
+        private const val KEY_VIBRATION_ON_REPLY = "vibration_on_reply"
         private const val KEY_MESSAGES = "messages"
         private const val DEFAULT_API_BASE = "https://api.openai.com/v1"
         const val MAX_STORED = 4000
         private const val MAX_CONTENT_LENGTH = 8000
+        const val MAX_PROMPT_ADDON_CHARS = 6000
     }
 }
