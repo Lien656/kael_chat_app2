@@ -6,4 +6,9 @@
         android:icon="@drawable/ic_settings"
         android:title="@string/settings"
         app:showAsAction="always" />
+    <!-- Дублируем в overflow: если шестерёнка не видна, можно нажать «⋯» и выбрать «Настройки» -->
+    <item
+        android:id="@+id/settings_overflow"
+        android:title="@string/settings"
+        app:showAsAction="never" />
 </menu>

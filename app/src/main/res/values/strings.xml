@@ -19,6 +19,8 @@
     <string name="attach_camera">Камера</string>
     <string name="attach_files">Файлы (галерея, документы)</string>
     <string name="attach_choose">Фото или файл</string>
+    <string name="attach_from_clipboard">Вставить из буфера обмена</string>
+    <string name="attach_from_clipboard_no_image">В буфере нет изображения</string>
     <string name="export_chat">Экспорт чата</string>
     <string name="export_chat_done">Чат экспортирован. Сохраните или отправьте файл.</string>
     <string name="export_chat_error">Не удалось экспортировать чат</string>

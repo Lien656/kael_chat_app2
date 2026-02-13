@@ -126,6 +126,8 @@ class ChatActivity : AppCompatActivity() {
         supportActionBar?.setDisplayHomeAsUpEnabled(false)
         toolbar.menu.clear()
         toolbar.inflateMenu(R.menu.chat_menu)
+        // Тап по заголовку «KAEL HOME» открывает настройки (если шестерёнка не видна)
+        toolbar.setOnClickListener { startActivity(Intent(this, SettingsActivity::class.java)) }
 
         adapter = ChatAdapter(
             messages = messages,
@@ -194,7 +196,7 @@ class ChatActivity : AppCompatActivity() {
         updatePendingAttachmentUi()
         toolbar.setOnMenuItemClickListener { item ->
             when (item.itemId) {
-                R.id.settings -> {
+                R.id.settings, R.id.settings_overflow -> {
                     startActivity(Intent(this, SettingsActivity::class.java))
                     true
                 }
@@ -364,10 +366,11 @@ class ChatActivity : AppCompatActivity() {
     private fun showAttachOptions() {
         val dialog = AlertDialog.Builder(this, R.style.DialogThemeKael)
             .setTitle(getString(R.string.attach_choose))
-            .setItems(arrayOf(getString(R.string.attach_camera), getString(R.string.attach_files))) { _, which ->
+            .setItems(arrayOf(getString(R.string.attach_camera), getString(R.string.attach_files), getString(R.string.attach_from_clipboard))) { _, which ->
                 when (which) {
                     0 -> takePicture()
                     1 -> pickFileLauncher.launch("*/*")
+                    2 -> pasteImageFromClipboard()
                 }
             }
             .create()
@@ -378,6 +381,41 @@ class ChatActivity : AppCompatActivity() {
                 window.setBackgroundBlurRadius(50)
             }
         }
+    }
+
+    /** Вставка фото из буфера обмена: если в буфере есть изображение — сохраняем в файл и ставим как вложение. */
+    private fun pasteImageFromClipboard() {
+        val cm = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return
+        val clip = cm.primaryClip ?: run {
+            Toast.makeText(this, R.string.attach_from_clipboard_no_image, Toast.LENGTH_SHORT).show()
+            return
+        }
+        for (i in 0 until clip.itemCount) {
+            val item = clip.getItemAt(i)
+            val uri = item.uri ?: continue
+            val type = contentResolver.getType(uri) ?: continue
+            if (!type.startsWith("image/")) continue
+            try {
+                val ext = when {
+                    type.contains("png") -> "png"
+                    type.contains("gif") -> "gif"
+                    type.contains("webp") -> "webp"
+                    else -> "jpg"
+                }
+                val dir = java.io.File(filesDir, "attachments").also { if (!it.exists()) it.mkdirs() }
+                val file = java.io.File(dir, "clip_${System.currentTimeMillis()}.$ext")
+                contentResolver.openInputStream(uri)?.use { input ->
+                    file.outputStream().use { output -> input.copyTo(output) }
+                }
+                if (file.exists()) {
+                    pendingAttachmentPath = file.absolutePath
+                    updatePendingAttachmentUi()
+                    Toast.makeText(this, getString(R.string.attach_from_clipboard), Toast.LENGTH_SHORT).show()
+                }
+                return
+            } catch (_: Exception) {}
+        }
+        Toast.makeText(this, R.string.attach_from_clipboard_no_image, Toast.LENGTH_SHORT).show()
     }
 
     private fun takePicture() {
