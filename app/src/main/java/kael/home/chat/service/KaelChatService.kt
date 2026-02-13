@@ -98,7 +98,6 @@ class KaelChatService : Service() {
                 val kaelLastChatGpt = storage.getKaelLastChatGPT()
                 val chatLogTail = storage.getChatLogTail(4000)
                 var currentHistory = history
-                val lastMsg = currentHistory.lastOrNull()
                 val visionKey = storage.visionApiKey
                 if (lastMsg?.role == "user" && !lastMsg.attachmentPath.isNullOrEmpty() && visionKey != null &&
                     lastMsg.attachmentPath!!.lowercase().let { it.endsWith(".jpg") || it.endsWith(".jpeg") || it.endsWith(".png") || it.endsWith(".gif") || it.endsWith(".webp") }) {
