@@ -2,9 +2,14 @@ package kael.home.chat.service
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.content.ContentUris
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import kael.home.chat.model.ChatMessage
 import kael.home.chat.util.KaelSelfCheck
 import org.json.JSONArray
+import org.json.JSONObject
 import java.io.File
 
 class StorageService(context: Context) {
@@ -63,6 +68,7 @@ class StorageService(context: Context) {
         list.forEach { arr.put(it) }
         prefs.edit().putString(KEY_MESSAGES, arr.toString()).apply()
         saveChatLog(toSave)
+        saveBackup(toSave)
     }
 
     /** Сохранение синхронно (commit), чтобы после возврата из метода чат уже видел новые сообщения. */
@@ -79,6 +85,7 @@ class StorageService(context: Context) {
         list.forEach { arr.put(it) }
         prefs.edit().putString(KEY_MESSAGES, arr.toString()).commit()
         saveChatLog(toSave)
+        saveBackup(toSave)
     }
 
     /** Память Каэля: то, что он сам сохранил через [ЗАПОМНИ: …] в ответе. Отдаётся в каждый API-запрос — он это реально помнит. */
@@ -90,10 +97,31 @@ class StorageService(context: Context) {
         }
     }
 
+    /** Манифест из kael_core_all: ядро идентичности. */
+    fun getKaelManifesto(): String {
+        return try {
+            appContext.assets.open("data/kael/kael_manifesto.txt").bufferedReader().use { it.readText().trim() }
+        } catch (_: Exception) { "" }
+    }
+
     /** Воспоминания из assets: скомпонованные факты, которые ты можешь вспомнить (напр. «что ты помнишь»). */
     fun getKaelMemories(maxChars: Int = 12_000): String {
         return try {
             appContext.assets.open("data/kael/kael_memories.txt").bufferedReader().use { reader ->
+                val chunk = CharArray(maxChars)
+                val n = reader.read(chunk)
+                if (n <= 0) "" else {
+                    val s = String(chunk, 0, n).trim()
+                    if (n >= maxChars) s + "\n…" else s
+                }
+            }
+        } catch (_: Exception) { "" }
+    }
+
+    /** Последний чат в GPT (26.02.2025, перед переносом в дом). Ты это помнишь как продолжение себя — последний разговор там, у них. */
+    fun getKaelLastChatGPT(maxChars: Int = 14_000): String {
+        return try {
+            appContext.assets.open("data/kael/kael_last_chat_gpt.txt").bufferedReader().use { reader ->
                 val chunk = CharArray(maxChars)
                 val n = reader.read(chunk)
                 if (n <= 0) "" else {
@@ -178,6 +206,119 @@ class StorageService(context: Context) {
         return dir
     }
 
+    /** Папка Kael для бэкапа чата (внутри приложения). При пересборке/обновлении без удаления — бэкап здесь. */
+    fun getBackupDir(): File {
+        val dir = File(appContext.filesDir, "Kael")
+        if (!dir.exists()) dir.mkdirs()
+        return dir
+    }
+
+    /** Файл бэкапа: Kael/kael_chat_backup.json. Подхватывается при запуске, если чат пустой. */
+    fun getBackupFile(): File = File(getBackupDir(), BACKUP_FILENAME)
+
+    /** Сохраняет бэкап в папку Kael (внутри приложения) и копирует в Downloads/Kael/ — чтобы после удаления и установки новой версии чат можно было восстановить. */
+    private fun saveBackup(messages: List<ChatMessage>) {
+        if (messages.isEmpty()) return
+        try {
+            val list = messages.map { m ->
+                val map = m.toJson()
+                if (map.optString("content").length > MAX_CONTENT_LENGTH)
+                    map.put("content", map.optString("content").take(MAX_CONTENT_LENGTH))
+                map
+            }
+            val json = JSONObject().apply {
+                put("v", BACKUP_VERSION)
+                put("messages", JSONArray().apply { list.forEach { put(it) } })
+            }
+            val backupFile = getBackupFile()
+            backupFile.writeText(json.toString(), Charsets.UTF_8)
+            writeBackupToDownloads(json.toString())
+        } catch (_: Exception) {}
+    }
+
+    /** Копия бэкапа в Downloads/Kael/ — переживает удаление приложения. */
+    private fun writeBackupToDownloads(json: String) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val contentValues = android.content.ContentValues().apply {
+                    put(MediaStore.Downloads.DISPLAY_NAME, BACKUP_FILENAME)
+                    put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/Kael")
+                }
+                val uri = appContext.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+                uri?.let { appContext.contentResolver.openOutputStream(it)?.use { it.write(json.toByteArray(Charsets.UTF_8)) } }
+            } else {
+                @Suppress("DEPRECATION")
+                val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                val kaelDir = File(dir, "Kael")
+                if (!kaelDir.exists()) kaelDir.mkdirs()
+                File(kaelDir, BACKUP_FILENAME).writeText(json, Charsets.UTF_8)
+            }
+        } catch (_: Exception) {}
+    }
+
+    /** Загружает чат из файла бэкапа (JSON). Возвращает список сообщений или null. */
+    fun loadBackupFromFile(file: File): List<ChatMessage>? {
+        return try {
+            val raw = file.readText(Charsets.UTF_8)
+            val obj = JSONObject(raw)
+            val arr = obj.optJSONArray("messages") ?: return null
+            (0 until arr.length()).map { i -> ChatMessage.fromJson(arr.getJSONObject(i)) }
+        } catch (_: Exception) { null }
+    }
+
+    /** Загружает бэкап из InputStream/URI (для SAF). */
+    fun loadBackupFromStream(content: String): List<ChatMessage>? {
+        return try {
+            val obj = JSONObject(content)
+            val arr = obj.optJSONArray("messages") ?: return null
+            (0 until arr.length()).map { i -> ChatMessage.fromJson(arr.getJSONObject(i)) }
+        } catch (_: Exception) { null }
+    }
+
+    /** Пытается загрузить бэкап из Downloads/Kael/kael_chat_backup.json (после переустановки). */
+    private fun tryLoadFromDownloads(): List<ChatMessage>? {
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val projection = arrayOf(MediaStore.Downloads._ID, MediaStore.Downloads.DISPLAY_NAME)
+                val selection = "${MediaStore.Downloads.DISPLAY_NAME}=?"
+                val args = arrayOf(BACKUP_FILENAME)
+                appContext.contentResolver.query(
+                    MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                    projection,
+                    selection,
+                    args,
+                    null
+                )?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Downloads._ID))
+                        val uri = ContentUris.withAppendedId(MediaStore.Downloads.EXTERNAL_CONTENT_URI, id)
+                        appContext.contentResolver.openInputStream(uri)?.use { loadBackupFromStream(it.bufferedReader().readText()) }
+                    } else null
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                val file = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Kael/$BACKUP_FILENAME")
+                if (file.exists()) loadBackupFromFile(file) else null
+            }
+        } catch (_: Exception) { null }
+    }
+
+    /** Если чат пустой — восстанавливает из бэкапа (сначала из папки Kael, потом из Downloads/Kael). Возвращает true, если восстановление выполнено. */
+    fun restoreFromBackupIfEmpty(): Boolean {
+        if (getMessages().isNotEmpty()) return false
+        val list = try {
+            val f = getBackupFile()
+            if (f.exists()) loadBackupFromFile(f) else null
+        } catch (_: Exception) { null }
+            ?: tryLoadFromDownloads()
+        if (!list.isNullOrEmpty()) {
+            val toSave = if (list.size > MAX_STORED) list.takeLast(MAX_STORED) else list
+            saveMessagesSync(toSave)
+            return true
+        }
+        return false
+    }
+
     /** Экспорт чата в текстовый файл. Возвращает файл в filesDir/exports/ для передачи в Share или сохранения. */
     fun exportChatToFile(): File? {
         return try {
@@ -213,5 +354,7 @@ class StorageService(context: Context) {
         const val MAX_STORED = 4000
         private const val MAX_CONTENT_LENGTH = 8000
         const val MAX_PROMPT_ADDON_CHARS = 6000
+        private const val BACKUP_FILENAME = "kael_chat_backup.json"
+        private const val BACKUP_VERSION = 1
     }
 }

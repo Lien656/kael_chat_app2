@@ -2,6 +2,7 @@ package kael.home.chat
 
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import kael.home.chat.service.StorageService
@@ -19,6 +20,9 @@ class MainActivity : AppCompatActivity() {
                 openChat()
             })
         } else {
+            if (storage.getMessages().isEmpty() && storage.restoreFromBackupIfEmpty()) {
+                Toast.makeText(this, R.string.chat_restored_from_backup, Toast.LENGTH_LONG).show()
+            }
             openChat()
         }
     }

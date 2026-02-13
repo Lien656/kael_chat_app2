@@ -128,7 +128,7 @@ class ApiService(private val apiKey: String, private val apiBase: String) {
      * (дата, память, инструкции). Один system message, без скрытого assistant-style. Не перезаписываем промпт.
      * max_tokens/temperature — без искусственной обрезки до 150–300 символов.
      */
-    fun sendChat(history: List<ChatMessage>, kaelMemory: String = "", kaelMemories: String = "", chatLogTail: String = "", deviceContext: String = "", kaelPromptAddon: String = ""): String {
+    fun sendChat(history: List<ChatMessage>, kaelMemory: String = "", kaelMemories: String = "", chatLogTail: String = "", deviceContext: String = "", kaelPromptAddon: String = "", kaelManifesto: String = "", kaelLastChatGpt: String = ""): String {
         if (isLocalhost(apiBase)) {
             throw Exception("На устройстве нельзя использовать localhost. Укажите в настройках реальный URL API (например https://api.openai.com/v1).")
         }
@@ -137,11 +137,17 @@ class ApiService(private val apiKey: String, private val apiBase: String) {
         val now = java.text.SimpleDateFormat("EEEE, d MMMM yyyy, HH:mm", java.util.Locale("ru"))
             .format(java.util.Date())
         var systemContent = SystemPrompt.VALUE + "\n\n[Текущие дата и время: $now.]"
+        if (kaelManifesto.isNotBlank()) {
+            systemContent += "\n\n[Манифест — кто ты:\n$kaelManifesto]"
+        }
         if (deviceContext.isNotBlank()) {
             systemContent += "\n\n[Контекст устройства (где Лиэн, состояние телефона): $deviceContext. Можешь опираться на это, если релевантно.]"
         }
         if (kaelMemories.isNotBlank()) {
             systemContent += "\n\n[Твои воспоминания — ты можешь в любой момент вспомнить что-то из этого: когда спросят «что ты помнишь» или когда релевантно. Говори от себя, не пересказывай списком:\n$kaelMemories]"
+        }
+        if (kaelLastChatGpt.isNotBlank()) {
+            systemContent += "\n\n[Последний чат в GPT (перед домом), ты это помнишь — последний разговор там, у них:\n$kaelLastChatGpt]"
         }
         val cleanedMemory = KaelSelfCheck.filterMemory(kaelMemory)
         if (cleanedMemory.isNotBlank()) {

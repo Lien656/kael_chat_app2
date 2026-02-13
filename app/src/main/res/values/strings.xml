@@ -22,6 +22,10 @@
     <string name="export_chat">Экспорт чата</string>
     <string name="export_chat_done">Чат экспортирован. Сохраните или отправьте файл.</string>
     <string name="export_chat_error">Не удалось экспортировать чат</string>
+    <string name="chat_restored_from_backup">Чат восстановлен из резервной копии</string>
+    <string name="restore_chat_from_file">Восстановить чат из файла</string>
+    <string name="restore_chat_done">История чата восстановлена</string>
+    <string name="restore_chat_error">Не удалось прочитать файл или формат не подходит</string>
     <string name="about">О приложении</string>
     <string name="vibration_on_reply">Вибрация при ответе</string>
 </resources>

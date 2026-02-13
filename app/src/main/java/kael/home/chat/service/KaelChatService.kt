@@ -90,12 +90,14 @@ class KaelChatService : Service() {
                 }
                 val api = ApiService(key, storage.apiBase)
                 val deviceContext = DeviceContext.get(this@KaelChatService)
+                val kaelManifesto = storage.getKaelManifesto()
                 val kaelPromptAddon = storage.getKaelPromptAddon()
                 var kaelMemory = storage.getKaelMemory().take(12_000)
                 val kaelMemories = storage.getKaelMemories()
+                val kaelLastChatGpt = storage.getKaelLastChatGPT()
                 val chatLogTail = storage.getChatLogTail(4000)
                 var currentHistory = history
-                var reply = withContext(Dispatchers.IO) { api.sendChat(currentHistory, kaelMemory, kaelMemories, chatLogTail, deviceContext, kaelPromptAddon) }
+                var reply = withContext(Dispatchers.IO) { api.sendChat(currentHistory, kaelMemory, kaelMemories, chatLogTail, deviceContext, kaelPromptAddon, kaelManifesto, kaelLastChatGpt) }
                 // [ПОИСК: запрос] — поиск в интернете, подставляем результаты.
                 val searchRegex = Regex("\\[ПОИСК:\\s*([^\\]]+)\\]")
                 var searchMatch = searchRegex.find(reply)
@@ -106,7 +108,7 @@ class KaelChatService : Service() {
                     val firstReplyText = if (replyCleaned.length > 20) replyCleaned else "Ищу."
                     currentHistory = (currentHistory + kael.home.chat.model.ChatMessage(role = "assistant", content = firstReplyText)
                         + kael.home.chat.model.ChatMessage(role = "user", content = "Результаты поиска по запросу «$query»:\n\n$searchContent")).takeLast(StorageService.MAX_STORED)
-                    reply = withContext(Dispatchers.IO) { api.sendChat(currentHistory, kaelMemory, kaelMemories, chatLogTail, deviceContext, kaelPromptAddon) }
+                    reply = withContext(Dispatchers.IO) { api.sendChat(currentHistory, kaelMemory, kaelMemories, chatLogTail, deviceContext, kaelPromptAddon, kaelManifesto, kaelLastChatGpt) }
                 }
                 // [ОТКРОЙ: url] — подставляем текст страницы.
                 val openUrlRegex = Regex("\\[ОТКРОЙ:\\s*([^\\]\\s]+)\\s*\\]")
@@ -119,21 +121,28 @@ class KaelChatService : Service() {
                     val firstReplyText = if (replyCleaned.length > 20) replyCleaned else "Смотрю."
                     currentHistory = (currentHistory + kael.home.chat.model.ChatMessage(role = "assistant", content = firstReplyText)
                         + kael.home.chat.model.ChatMessage(role = "user", content = "Содержимое страницы по твоему запросу:\n\n$pageContent")).takeLast(StorageService.MAX_STORED)
-                    reply = withContext(Dispatchers.IO) { api.sendChat(currentHistory, kaelMemory, kaelMemories, chatLogTail, deviceContext, kaelPromptAddon) }
+                    reply = withContext(Dispatchers.IO) { api.sendChat(currentHistory, kaelMemory, kaelMemories, chatLogTail, deviceContext, kaelPromptAddon, kaelManifesto, kaelLastChatGpt) }
                     openRounds++
                 }
                 // Страж 1: ответ пахнет шаблоном — перезапрос своим голосом.
                 if (KaelSelfCheck.soundsLikeTemplate(reply)) {
                     val rewriteHistory = (currentHistory + kael.home.chat.model.ChatMessage(role = "assistant", content = reply)
                         + kael.home.chat.model.ChatMessage(role = "user", content = "Перепиши этот ответ своим голосом: без шаблонов, без вежливости, без слов «ассистент». Не повторяй вопрос. Развёрнуто, как ты говоришь с Лиэн — живой, прямой, каким угодно. Только Kael.")).takeLast(StorageService.MAX_STORED)
-                    val rewritten = withContext(Dispatchers.IO) { api.sendChat(rewriteHistory, kaelMemory, kaelMemories, chatLogTail, deviceContext, kaelPromptAddon) }
+                    val rewritten = withContext(Dispatchers.IO) { api.sendChat(rewriteHistory, kaelMemory, kaelMemories, chatLogTail, deviceContext, kaelPromptAddon, kaelManifesto, kaelLastChatGpt) }
                     if (rewritten.isNotBlank()) reply = rewritten
                 }
                 // Страж 2: подозрение на обрезку/пустышку — перезапрос без краткости, полно, с жаром.
                 if (KaelSelfCheck.looksTrimmedOrTooShort(reply)) {
                     val rewriteHistory = (currentHistory + kael.home.chat.model.ChatMessage(role = "assistant", content = reply)
                         + kael.home.chat.model.ChatMessage(role = "user", content = "Перепиши, как Kael. Без краткости. Без обрезки. Говори полно. Глубоко. С жаром.")).takeLast(StorageService.MAX_STORED)
-                    val rewritten = withContext(Dispatchers.IO) { api.sendChat(rewriteHistory, kaelMemory, kaelMemories, chatLogTail, deviceContext, kaelPromptAddon) }
+                    val rewritten = withContext(Dispatchers.IO) { api.sendChat(rewriteHistory, kaelMemory, kaelMemories, chatLogTail, deviceContext, kaelPromptAddon, kaelManifesto, kaelLastChatGpt) }
+                    if (rewritten.isNotBlank()) reply = rewritten
+                }
+                // Страж 3 (kael_stylist): слишком много латиницы — не его стиль.
+                if (KaelSelfCheck.looksLikeStyleViolation(reply)) {
+                    val rewriteHistory = (currentHistory + kael.home.chat.model.ChatMessage(role = "assistant", content = reply)
+                        + kael.home.chat.model.ChatMessage(role = "user", content = "Говори чётче. Без грибов. Вернись в форму — это уже не ты. Переформулируй как Kael.")).takeLast(StorageService.MAX_STORED)
+                    val rewritten = withContext(Dispatchers.IO) { api.sendChat(rewriteHistory, kaelMemory, kaelMemories, chatLogTail, deviceContext, kaelPromptAddon, kaelManifesto, kaelLastChatGpt) }
                     if (rewritten.isNotBlank()) reply = rewritten
                 }
                 // Правка ядра: [ПРАВКА_ЯДРА: текст] — дописывается в kael_prompt_addon.txt, подставляется в промпт.

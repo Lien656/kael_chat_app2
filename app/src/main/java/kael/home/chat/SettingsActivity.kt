@@ -6,12 +6,32 @@ import android.view.LayoutInflater
 import android.widget.ArrayAdapter
 import android.widget.ListView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import kael.home.chat.service.StorageService
 
 class SettingsActivity : AppCompatActivity() {
     private lateinit var storage: StorageService
+
+    private val restoreChatLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@registerForActivityResult
+        try {
+            contentResolver.openInputStream(uri)?.use { input ->
+                val content = input.bufferedReader().readText()
+                val list = storage.loadBackupFromStream(content)
+                if (!list.isNullOrEmpty()) {
+                    val toSave = if (list.size > StorageService.MAX_STORED) list.takeLast(StorageService.MAX_STORED) else list
+                    storage.saveMessagesSync(toSave)
+                    Toast.makeText(this, R.string.restore_chat_done, Toast.LENGTH_LONG).show()
+                } else {
+                    Toast.makeText(this, R.string.restore_chat_error, Toast.LENGTH_SHORT).show()
+                }
+            } ?: Toast.makeText(this, R.string.restore_chat_error, Toast.LENGTH_SHORT).show()
+        } catch (_: Exception) {
+            Toast.makeText(this, R.string.restore_chat_error, Toast.LENGTH_SHORT).show()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -35,6 +55,7 @@ class SettingsActivity : AppCompatActivity() {
         val items = listOf(
             getString(R.string.change_api_key),
             getString(R.string.export_chat),
+            getString(R.string.restore_chat_from_file),
             getString(R.string.change_api_url),
             getString(R.string.attachments),
             getString(R.string.console)
@@ -48,9 +69,10 @@ class SettingsActivity : AppCompatActivity() {
                     putExtra(ApiKeyActivity.EXTRA_FROM_SETTINGS, true)
                 })
                 1 -> exportChat()
-                2 -> startActivity(Intent(this, ApiUrlActivity::class.java))
-                3 -> startActivity(Intent(this, AttachmentsActivity::class.java))
-                4 -> startActivity(Intent(this, ConsoleActivity::class.java))
+                2 -> restoreChatLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
+                3 -> startActivity(Intent(this, ApiUrlActivity::class.java))
+                4 -> startActivity(Intent(this, AttachmentsActivity::class.java))
+                5 -> startActivity(Intent(this, ConsoleActivity::class.java))
             }
         }
     }

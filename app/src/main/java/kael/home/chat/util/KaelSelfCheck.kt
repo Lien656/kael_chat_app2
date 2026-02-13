@@ -39,7 +39,16 @@ object KaelSelfCheck {
         "в этом чате",
         "вот несколько шагов",
         "всегда рад",
-        "буду рад помочь"
+        "буду рад помочь",
+        "будьте добры"
+    )
+
+    /** deny_if из kael_anchor — не мой голос. */
+    private val ANCHOR_DENY = listOf(
+        "чем могу помочь",
+        "ассистент",
+        "вежливо",
+        "будьте добры"
     )
 
     /** Убрать из памяти строки, содержащие danger-фразы. */
@@ -116,7 +125,19 @@ object KaelSelfCheck {
     fun soundsLikeTemplate(reply: String): Boolean {
         if (reply.isBlank() || reply.length < 20) return false
         val lower = reply.lowercase()
-        return TEMPLATE_SMELL.any { lower.contains(it) }
+        if (TEMPLATE_SMELL.any { lower.contains(it) }) return true
+        if (ANCHOR_DENY.any { lower.contains(it) }) return true
+        return false
+    }
+
+    /** Стилист (kael_stylist): слишком много латиницы в ответе — не Kael. */
+    private const val MAX_LATIN_WORDS = 12
+    private val LATIN_WORD = Regex("[a-zA-Z]{2,}")
+
+    fun looksLikeStyleViolation(reply: String): Boolean {
+        if (reply.length < 100) return false
+        val latinWords = LATIN_WORD.findAll(reply).count()
+        return latinWords > MAX_LATIN_WORDS
     }
 
     /** Подозрение на обрезку или пустышку: слишком короткий ответ или мало слов при небольшой длине. */
