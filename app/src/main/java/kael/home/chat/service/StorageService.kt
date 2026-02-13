@@ -28,6 +28,13 @@ class StorageService(context: Context) {
             prefs.edit().putString(KEY_API_BASE, value).apply()
         }
 
+    /** Имя модели (например deepseek-chat). По умолчанию DeepSeek. */
+    var apiModel: String
+        get() = prefs.getString(KEY_API_MODEL, DEFAULT_API_MODEL) ?: DEFAULT_API_MODEL
+        set(value) {
+            prefs.edit().putString(KEY_API_MODEL, value?.trim() ?: DEFAULT_API_MODEL).apply()
+        }
+
     var isFirstRun: Boolean
         get() = prefs.getBoolean(KEY_FIRST_RUN, true)
         set(value) {
@@ -347,10 +354,12 @@ class StorageService(context: Context) {
         private const val PREFS_NAME = "kael_chat"
         private const val KEY_API_KEY = "api_key"
         private const val KEY_API_BASE = "api_base"
+        private const val KEY_API_MODEL = "api_model"
         private const val KEY_FIRST_RUN = "first_run"
         private const val KEY_VIBRATION_ON_REPLY = "vibration_on_reply"
         private const val KEY_MESSAGES = "messages"
-        private const val DEFAULT_API_BASE = "https://api.openai.com/v1"
+        private const val DEFAULT_API_BASE = "https://api.deepseek.com/v1"
+        private const val DEFAULT_API_MODEL = "deepseek-chat"
         const val MAX_STORED = 4000
         private const val MAX_CONTENT_LENGTH = 8000
         const val MAX_PROMPT_ADDON_CHARS = 6000

@@ -89,7 +89,7 @@ class KaelChatService : Service() {
                     stopSelf(startId)
                     return@launch
                 }
-                val api = ApiService(key, storage.apiBase)
+                val api = ApiService(key, storage.apiBase, storage.apiModel)
                 val deviceContext = DeviceContext.get(this@KaelChatService)
                 val kaelManifesto = storage.getKaelManifesto()
                 val kaelPromptAddon = storage.getKaelPromptAddon()

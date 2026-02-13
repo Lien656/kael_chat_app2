@@ -14,7 +14,7 @@ import java.io.File
 import java.nio.charset.Charset
 import java.util.concurrent.TimeUnit
 
-class ApiService(private val apiKey: String, private val apiBase: String) {
+class ApiService(private val apiKey: String, private val apiBase: String, private val modelName: String) {
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
@@ -183,10 +183,10 @@ class ApiService(private val apiKey: String, private val apiBase: String) {
         }
         // Без assistant-style в теле: только model, messages, stream, temperature, max_tokens. top_p не ставим — по умолчанию 1.0.
         val body = JSONObject()
-            .put("model", MODEL_PRIMARY)
+            .put("model", modelName.ifBlank { DEFAULT_MODEL })
             .put("messages", messages)
             .put("stream", false)
-            .put("temperature", 1.0)
+            .put("temperature", 1.2)
             .put("max_tokens", MAX_TOKENS_RESPONSE)
         val req = Request.Builder()
             .url(url("chat/completions"))
@@ -208,7 +208,7 @@ class ApiService(private val apiKey: String, private val apiBase: String) {
             }
         }
         if (resp.code == 404 || (resp.code == 400 && (respBodyStr.contains("model") || respBodyStr.contains("invalid")))) {
-            body.put("model", MODEL_FALLBACK)
+            body.put("model", FALLBACK_MODEL)
             val fallbackReq = Request.Builder()
                 .url(url("chat/completions"))
                 .header("Authorization", "Bearer $apiKey")
@@ -224,8 +224,8 @@ class ApiService(private val apiKey: String, private val apiBase: String) {
                     if (msg != null) return msg.optString("content", "").trim()
                 }
             }
-            // Третий вариант: gpt-5.2, если отключили 4o и 4o-mini.
-            body.put("model", MODEL_FALLBACK_2)
+            // Третий вариант: снова deepseek-chat.
+            body.put("model", FALLBACK_MODEL_2)
             val fallback2Req = Request.Builder()
                 .url(url("chat/completions"))
                 .header("Authorization", "Bearer $apiKey")
@@ -249,14 +249,14 @@ class ApiService(private val apiKey: String, private val apiBase: String) {
     }
 
     companion object {
-        private const val MODEL_PRIMARY = "gpt-4o"
-        private const val MODEL_FALLBACK = "gpt-4o-mini"
-        private const val MODEL_FALLBACK_2 = "gpt-5.2"
+        private const val DEFAULT_MODEL = "deepseek-chat"
+        private const val FALLBACK_MODEL = "deepseek-reasoner"
+        private const val FALLBACK_MODEL_2 = "deepseek-chat"
         private const val MAX_HISTORY = 4000
         /** Сколько последних сообщений уходит в API — больше = больше контекста, меньше «сжатия». */
         private const val MAX_MESSAGES_PER_REQUEST = 32
         private const val MAX_CONTENT_CHARS_PER_MESSAGE = 6000
-        /** Лимит токенов на ответ — развёрнутый голос, не режем ответы. */
-        private const val MAX_TOKENS_RESPONSE = 4096
+        /** Лимит токенов на ответ. 1200 — как договаривались; можно поднять при необходимости. */
+        private const val MAX_TOKENS_RESPONSE = 1200
     }
 }

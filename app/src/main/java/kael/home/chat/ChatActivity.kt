@@ -229,7 +229,7 @@ class ChatActivity : AppCompatActivity() {
         }
         lifecycleScope.launch {
             val err = withContext(Dispatchers.IO) {
-                ApiService(key, storage.apiBase).checkApiConnection()
+                ApiService(key, storage.apiBase, storage.apiModel).checkApiConnection()
             }
             if (err != null) {
                 addAssistantMessage(err)

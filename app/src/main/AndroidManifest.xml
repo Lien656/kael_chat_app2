@@ -60,6 +60,12 @@
             android:theme="@style/Theme.KaelChat" />
 
         <activity
+            android:name="kael.home.chat.ApiModelActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.KaelChat" />
+
+        <activity
             android:name="kael.home.chat.ConsoleActivity"
             android:exported="false"
             android:theme="@style/Theme.KaelChat" />

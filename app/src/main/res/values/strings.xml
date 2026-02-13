@@ -8,8 +8,10 @@
     <string name="settings">Настройки</string>
     <string name="change_api_key">Изменить API ключ</string>
     <string name="change_api_url">Изменить API URL</string>
+    <string name="change_api_model">Модель (имя)</string>
+    <string name="api_model_hint">deepseek-chat</string>
     <string name="console">Открыть консоль</string>
-    <string name="api_url_hint">https://api.openai.com/v1</string>
+    <string name="api_url_hint">https://api.deepseek.com/v1</string>
     <string name="save">Сохранить</string>
     <string name="typing">печатает…</string>
     <string name="copied">Скопировано</string>
