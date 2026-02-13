@@ -11,6 +11,10 @@
         <item name="colorPrimary">@color/kael_name</item>
         <item name="colorOnSurface">@color/text</item>
     </style>
+    <!-- Иконки в тулбаре (шестерёнка настроек) — светлые, чтобы были видны на тёмном фоне -->
+    <style name="ThemeOverlay.KaelToolbarIcons" parent="ThemeOverlay.MaterialComponents.Toolbar">
+        <item name="colorControlNormal">@color/text</item>
+    </style>
     <!-- Диалог «Фото или файл»: матовое стекло, цвет Каэля, полупрозрачный -->
     <style name="DialogThemeKael" parent="Theme.MaterialComponents.DayNight.Dialog.Alert">
         <item name="android:windowBackground">@drawable/dialog_kael_glass</item>

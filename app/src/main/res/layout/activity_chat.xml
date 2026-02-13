@@ -13,7 +13,8 @@
         android:background="@color/background"
         app:title="@string/app_name"
         app:titleTextAppearance="@style/TitleKaelHome"
-        app:titleTextColor="@color/kael_name" />
+        app:titleTextColor="@color/kael_title"
+        app:theme="@style/ThemeOverlay.KaelToolbarIcons" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recycler"
