@@ -59,18 +59,9 @@ class ApiService(private val apiKey: String, private val apiBase: String, privat
             if (isImagePath(m.attachmentPath)) {
                 val bytes = file.readBytes()
                 if (bytes.size > 4_000_000) return m.content + " [изображение слишком большое]"
-                val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
-                val mime = mimeForPath(m.attachmentPath!!)
-                val contentArr = JSONArray()
                 val userText = m.content.trim()
-                if (userText.isNotEmpty() && userText != "(файл)") {
-                    contentArr.put(JSONObject().put("type", "text").put("text", userText))
-                } else {
-                    contentArr.put(JSONObject().put("type", "text").put("text", "Пользователь отправил изображение. Ты его видишь. Опиши: что на нём (текст, люди, сцена, скриншот). Запоминай важное через [ЗАПОМНИ: …]. Не пиши «извини» или «не могу» — ты видишь и анализируешь."))
-                }
-                val imageUrlObj = JSONObject().put("url", "data:$mime;base64,$base64").put("detail", "high")
-                contentArr.put(JSONObject().put("type", "image_url").put("image_url", imageUrlObj))
-                contentArr
+                val prefix = if (userText.isNotEmpty() && userText != "(файл)") "$userText\n\n" else ""
+                return prefix + "Пользователь отправил изображение (фото/скриншот). API не поддерживает передачу картинок — только текст. Ответь по контексту или попроси описать изображение словами."
             } else {
                 val name = file.name
                 val fileContent = readTextFileSafe(file)
