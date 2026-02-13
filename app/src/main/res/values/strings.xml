@@ -32,4 +32,9 @@
     <string name="restore_chat_error">Не удалось прочитать файл или формат не подходит</string>
     <string name="about">О приложении</string>
     <string name="vibration_on_reply">Вибрация при ответе</string>
+    <string name="vision_api_title">Глаза (vision API)</string>
+    <string name="vision_api_hint">Для картинок: описание получает дешёвая модель (OpenAI mini и т.п.). Kael говорит через DeepSeek. Оставь ключ пустым — картинки не будут разбираться.</string>
+    <string name="vision_api_key_hint">API ключ (OpenAI или совместимый)</string>
+    <string name="vision_api_base_hint">https://api.openai.com/v1</string>
+    <string name="vision_model_hint">gpt-4o-mini</string>
 </resources>

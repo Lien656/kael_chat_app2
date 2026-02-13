@@ -58,6 +58,7 @@ class SettingsActivity : AppCompatActivity() {
             getString(R.string.restore_chat_from_file),
             getString(R.string.change_api_url),
             getString(R.string.change_api_model),
+            getString(R.string.vision_api_title),
             getString(R.string.attachments),
             getString(R.string.console)
         )
@@ -73,8 +74,9 @@ class SettingsActivity : AppCompatActivity() {
                 2 -> restoreChatLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
                 3 -> startActivity(Intent(this, ApiUrlActivity::class.java))
                 4 -> startActivity(Intent(this, ApiModelActivity::class.java))
-                5 -> startActivity(Intent(this, AttachmentsActivity::class.java))
-                6 -> startActivity(Intent(this, ConsoleActivity::class.java))
+                5 -> startActivity(Intent(this, VisionApiActivity::class.java))
+                6 -> startActivity(Intent(this, AttachmentsActivity::class.java))
+                7 -> startActivity(Intent(this, ConsoleActivity::class.java))
             }
         }
     }

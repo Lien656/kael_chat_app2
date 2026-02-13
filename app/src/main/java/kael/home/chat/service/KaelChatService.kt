@@ -98,6 +98,19 @@ class KaelChatService : Service() {
                 val kaelLastChatGpt = storage.getKaelLastChatGPT()
                 val chatLogTail = storage.getChatLogTail(4000)
                 var currentHistory = history
+                val lastMsg = currentHistory.lastOrNull()
+                val visionKey = storage.visionApiKey
+                if (lastMsg?.role == "user" && !lastMsg.attachmentPath.isNullOrEmpty() && visionKey != null &&
+                    lastMsg.attachmentPath!!.lowercase().let { it.endsWith(".jpg") || it.endsWith(".jpeg") || it.endsWith(".png") || it.endsWith(".gif") || it.endsWith(".webp") }) {
+                    val desc = withContext(Dispatchers.IO) {
+                        api.describeImage(visionKey, storage.visionApiBase, storage.visionModel, lastMsg.attachmentPath!!, lastMsg.content)
+                    }
+                    if (desc != null) {
+                        val userText = lastMsg.content.trim().takeIf { it.isNotEmpty() && it != "(файл)" }?.let { "$it\n\n" } ?: ""
+                        val textWithImage = "${userText}[На изображении: $desc]"
+                        currentHistory = currentHistory.dropLast(1) + kael.home.chat.model.ChatMessage(role = "user", content = textWithImage, attachmentPath = null)
+                    }
+                }
                 var reply = withContext(Dispatchers.IO) { api.sendChat(currentHistory, kaelMemory, kaelMemories, chatLogTail, deviceContext, kaelPromptAddon, kaelManifesto, kaelLastChatGpt) }
                 // [ПОИСК: запрос] — поиск в интернете, подставляем результаты.
                 val searchRegex = Regex("\\[ПОИСК:\\s*([^\\]]+)\\]")

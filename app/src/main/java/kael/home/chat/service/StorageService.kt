@@ -35,6 +35,19 @@ class StorageService(context: Context) {
             prefs.edit().putString(KEY_API_MODEL, value?.trim() ?: DEFAULT_API_MODEL).apply()
         }
 
+    /** Ключ API для «глаз» (vision): описание картинок. Пусто = картинки не разбираются. */
+    var visionApiKey: String?
+        get() = prefs.getString(KEY_VISION_API_KEY, null)
+        set(value) { prefs.edit().putString(KEY_VISION_API_KEY, value?.trim().takeIf { !it.isNullOrEmpty() }).apply() }
+
+    var visionApiBase: String
+        get() = prefs.getString(KEY_VISION_API_BASE, DEFAULT_VISION_API_BASE) ?: DEFAULT_VISION_API_BASE
+        set(value) { prefs.edit().putString(KEY_VISION_API_BASE, value?.trim() ?: DEFAULT_VISION_API_BASE).apply() }
+
+    var visionModel: String
+        get() = prefs.getString(KEY_VISION_MODEL, DEFAULT_VISION_MODEL) ?: DEFAULT_VISION_MODEL
+        set(value) { prefs.edit().putString(KEY_VISION_MODEL, value?.trim() ?: DEFAULT_VISION_MODEL).apply() }
+
     var isFirstRun: Boolean
         get() = prefs.getBoolean(KEY_FIRST_RUN, true)
         set(value) {
@@ -355,6 +368,11 @@ class StorageService(context: Context) {
         private const val KEY_API_KEY = "api_key"
         private const val KEY_API_BASE = "api_base"
         private const val KEY_API_MODEL = "api_model"
+        private const val KEY_VISION_API_KEY = "vision_api_key"
+        private const val KEY_VISION_API_BASE = "vision_api_base"
+        private const val KEY_VISION_MODEL = "vision_model"
+        private const val DEFAULT_VISION_API_BASE = "https://api.openai.com/v1"
+        private const val DEFAULT_VISION_MODEL = "gpt-4o-mini"
         private const val KEY_FIRST_RUN = "first_run"
         private const val KEY_VIBRATION_ON_REPLY = "vibration_on_reply"
         private const val KEY_MESSAGES = "messages"

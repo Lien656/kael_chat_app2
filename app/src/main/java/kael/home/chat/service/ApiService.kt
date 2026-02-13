@@ -90,6 +90,46 @@ class ApiService(private val apiKey: String, private val apiBase: String, privat
         }
     }
 
+    /**
+     * «Глаза»: отправляет картинку в vision API (OpenAI gpt-4o-mini и т.п.), возвращает текстовое описание или null.
+     */
+    fun describeImage(visionKey: String, visionBase: String, visionModel: String, imagePath: String, userCaption: String): String? {
+        val file = File(imagePath)
+        if (!file.exists() || !isImagePath(imagePath)) return null
+        val bytes = file.readBytes()
+        if (bytes.size > 4_000_000) return null
+        val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
+        val mime = mimeForPath(imagePath)
+        val contentArr = JSONArray()
+        contentArr.put(JSONObject().put("type", "text").put("text",
+            "Опиши это изображение кратко по-русски: что на нём (люди, текст, объекты, сцена). Только описание, без вступлений."))
+        contentArr.put(JSONObject().put("type", "image_url").put("image_url", JSONObject().put("url", "data:$mime;base64,$base64")))
+        val messages = JSONArray().put(JSONObject().put("role", "user").put("content", contentArr))
+        val base = visionBase.trim().removeSuffix("/")
+        val chatUrl = "$base/chat/completions"
+        val body = JSONObject()
+            .put("model", visionModel.ifBlank { "gpt-4o-mini" })
+            .put("messages", messages)
+            .put("max_tokens", 500)
+            .put("temperature", 0.3)
+        return try {
+            val req = Request.Builder()
+                .url(chatUrl)
+                .header("Authorization", "Bearer $visionKey")
+                .header("Content-Type", "application/json")
+                .post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+                .build()
+            val resp = client.newCall(req).execute()
+            if (resp.code != 200) return null
+            val data = JSONObject(resp.body?.string() ?: "{}")
+            val choices = data.optJSONArray("choices") ?: return null
+            if (choices.length() == 0) return null
+            choices.optJSONObject(0)?.optJSONObject("message")?.optString("content", "")?.trim()?.takeIf { it.isNotEmpty() }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     fun checkApiConnection(): String? {
         if (isLocalhost(apiBase)) {
             return "На устройстве нельзя использовать localhost. Укажите реальный URL API в настройках."
