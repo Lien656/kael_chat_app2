@@ -31,6 +31,12 @@ chmod +x gradlew
 
 APK будет в: `app/build/outputs/apk/debug/app-debug.apk`.
 
+**Ключ для «глаз» (vision, OpenAI):** чтобы картинки разбирались без ввода ключа в приложении, добавь в корень проекта в файл `local.properties` строку:
+```properties
+vision.api.key=sk-proj-ТВОЙ_OPENAI_КЛЮЧ
+```
+(файл `local.properties` в репозиторий не попадает.)
+
 ### 3. Сборка в Android Studio
 
 1. **File → Open** → выбери папку `kael_chat_app2` (корень репозитория).
