@@ -11,11 +11,6 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
-        val localProperties = java.util.Properties()
-        val localFile = rootProject.file("local.properties")
-        if (localFile.exists()) localProperties.load(localFile.inputStream())
-        val visionKey = (localProperties.getProperty("vision.api.key") ?: "").replace("\\", "\\\\").replace("\"", "\\\"")
-        buildConfigField("String", "VISION_API_KEY_DEFAULT", "\"$visionKey\"")
     }
     buildTypes {
         release {
@@ -35,7 +30,6 @@ android {
     }
     buildFeatures {
         viewBinding = true
-        buildConfig = true
     }
 }
 dependencies {
