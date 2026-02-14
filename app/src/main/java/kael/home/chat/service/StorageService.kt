@@ -379,7 +379,8 @@ class StorageService(context: Context) {
         private const val DEFAULT_API_BASE = "https://api.deepseek.com/v1"
         private const val DEFAULT_API_MODEL = "deepseek-chat"
         const val MAX_STORED = 4000
-        private const val MAX_CONTENT_LENGTH = 8000
+        /** Лимит длины контента сообщения при сохранении. */
+        private const val MAX_CONTENT_LENGTH = 20_000
         const val MAX_PROMPT_ADDON_CHARS = 6000
         private const val BACKUP_FILENAME = "kael_chat_backup.json"
         private const val BACKUP_VERSION = 1

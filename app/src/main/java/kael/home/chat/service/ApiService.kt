@@ -49,7 +49,8 @@ class ApiService(private val apiKey: String, private val apiBase: String, privat
         }
     }
 
-    private val maxTextFileBytes = 8_000
+    /** До ~3+ страниц A4. */
+    private val maxTextFileBytes = 20_000
 
     private fun buildMessageContent(m: ChatMessage): Any {
         return try {
@@ -286,7 +287,8 @@ class ApiService(private val apiKey: String, private val apiBase: String, privat
         private const val MAX_HISTORY = 4000
         /** Сколько последних сообщений уходит в API — больше = больше контекста, меньше «сжатия». */
         private const val MAX_MESSAGES_PER_REQUEST = 32
-        private const val MAX_CONTENT_CHARS_PER_MESSAGE = 6000
+        /** Лимит символов в одном сообщении (в т.ч. прикреплённый файл). */
+        private const val MAX_CONTENT_CHARS_PER_MESSAGE = 20_000
         /** Лимит токенов на ответ. 1200 — как договаривались; можно поднять при необходимости. */
         private const val MAX_TOKENS_RESPONSE = 1200
     }
