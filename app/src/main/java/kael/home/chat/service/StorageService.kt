@@ -35,18 +35,10 @@ class StorageService(context: Context) {
             prefs.edit().putString(KEY_API_MODEL, value?.trim() ?: DEFAULT_API_MODEL).apply()
         }
 
-    /** Ключ API для «глаз» (vision): описание картинок. По умолчанию из local.properties (vision.api.key). */
+    /** Ключ API для «глаз» (vision): описание картинок. Пусто = картинки не разбираются. Ввод в настройках. */
     var visionApiKey: String?
-        get() {
-            val v = prefs.getString(KEY_VISION_API_KEY, null)
-            val builtIn = kael.home.chat.BuildConfig.VISION_API_KEY_DEFAULT.takeIf { it.isNotBlank() }
-            return when {
-                v == null -> builtIn
-                v.isEmpty() -> null
-                else -> v
-            }
-        }
-        set(value) { prefs.edit().putString(KEY_VISION_API_KEY, value?.trim() ?: "").apply() }
+        get() = prefs.getString(KEY_VISION_API_KEY, null)
+        set(value) { prefs.edit().putString(KEY_VISION_API_KEY, value?.trim().takeIf { !it.isNullOrEmpty() }).apply() }
 
     var visionApiBase: String
         get() = prefs.getString(KEY_VISION_API_BASE, DEFAULT_VISION_API_BASE) ?: DEFAULT_VISION_API_BASE
